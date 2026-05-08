@@ -1,0 +1,399 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        flex-shrink: 0;
+    }
+
+    .stat-icon.primary {
+        background-color: rgba(52, 152, 219, 0.1);
+        color: #3498db;
+    }
+
+    .stat-icon.success {
+        background-color: rgba(46, 204, 113, 0.1);
+        color: #2ecc71;
+    }
+
+    .stat-icon.warning {
+        background-color: rgba(241, 196, 15, 0.1);
+        color: #f1c40f;
+    }
+
+    .stat-icon.danger {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+
+    .stat-content h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin: 0;
+        line-height: 1;
+    }
+
+    .stat-content p {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        margin: 0.5rem 0 0 0;
+    }
+
+    .welcome-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    }
+
+    .welcome-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .welcome-subtitle {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    .welcome-icon {
+        font-size: 3rem;
+        opacity: 0.2;
+        position: absolute;
+        right: 2rem;
+        top: 2rem;
+    }
+
+    .recent-activity {
+        background: white;
+        border-radius: 8px;
+        box-shadow: var(--card-shadow);
+        padding: 1.5rem;
+    }
+
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid #ecf0f1;
+    }
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 1.2rem;
+    }
+
+    .activity-icon.info {
+        background-color: rgba(52, 152, 219, 0.1);
+        color: #3498db;
+    }
+
+    .activity-icon.success {
+        background-color: rgba(46, 204, 113, 0.1);
+        color: #2ecc71;
+    }
+
+    .activity-icon.warning {
+        background-color: rgba(241, 196, 15, 0.1);
+        color: #f1c40f;
+    }
+
+    .activity-text {
+        flex: 1;
+    }
+
+    .activity-title {
+        font-weight: 600;
+        color: var(--primary-color);
+        margin: 0;
+    }
+
+    .activity-time {
+        font-size: 0.85rem;
+        color: #7f8c8d;
+        margin: 0.3rem 0 0 0;
+    }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .action-btn {
+        background: white;
+        border: 2px solid #ecf0f1;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .action-btn:hover {
+        border-color: #3498db;
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+    }
+
+    .action-btn i {
+        font-size: 2rem;
+        color: #3498db;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .action-btn span {
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: block;
+        color: var(--primary-color);
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .welcome-section {
+            padding: 1.5rem;
+        }
+
+        .welcome-title {
+            font-size: 1.3rem;
+        }
+
+        .welcome-icon {
+            font-size: 2rem;
+            right: 1rem;
+            top: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- WELCOME SECTION -->
+<div class="welcome-section">
+    <div class="welcome-icon">
+        <i class="bi bi-book-half"></i>
+    </div>
+    <h1 class="welcome-title">¡Bienvenido, {{ current_user.nombre }}!</h1>
+    <p class="welcome-subtitle">Sistema de Gestión Agrícola Digital - Cuaderno de Campo</p>
+</div>
+
+<!-- ESTADÍSTICAS -->
+{% if current_user.rol == 'admin' %}
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-icon primary">
+            <i class="bi bi-people-fill"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ total_usuarios|default:"0" }}</h3>
+            <p>Usuarios Registrados</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon success">
+            <i class="bi bi-person-check-fill"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ usuarios_activos|default:"0" }}</h3>
+            <p>Usuarios Activos</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon warning">
+            <i class="bi bi-person-fill"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ administradores|default:"0" }}</h3>
+            <p>Administradores</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon danger">
+            <i class="bi bi-person-slash-fill"></i>
+        </div>
+        <div class="stat-content">
+            <h3>{{ usuarios_inactivos|default:"0" }}</h3>
+            <p>Usuarios Inactivos</p>
+        </div>
+    </div>
+</div>
+
+<!-- ACCIONES RÁPIDAS -->
+<div class="card">
+    <h3 style="margin-top: 0;">
+        <i class="bi bi-lightning-fill"></i> Acciones Rápidas
+    </h3>
+    <div class="quick-actions">
+        <a href="{% url 'usuarios_lista' %}" class="action-btn">
+            <i class="bi bi-people-fill"></i>
+            <span>Gestionar Usuarios</span>
+        </a>
+        <a href="{% url 'usuarios_lista' %}" class="action-btn">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>Agregar Usuario</span>
+        </a>
+        <button class="action-btn" onclick="alert('Próximamente disponible')">
+            <i class="bi bi-file-earmark-pdf"></i>
+            <span>Reportes</span>
+        </button>
+        <button class="action-btn" onclick="alert('Próximamente disponible')">
+            <i class="bi bi-gear-fill"></i>
+            <span>Configuración</span>
+        </button>
+    </div>
+</div>
+
+<!-- ACTIVIDAD RECIENTE -->
+<div class="recent-activity">
+    <h3 style="margin-top: 0; margin-bottom: 1rem;">
+        <i class="bi bi-clock-history"></i> Actividad Reciente
+    </h3>
+    
+    <div class="activity-item">
+        <div class="activity-icon success">
+            <i class="bi bi-check-circle-fill"></i>
+        </div>
+        <div class="activity-text">
+            <p class="activity-title">Sistema Iniciado</p>
+            <p class="activity-time">Hoy, {{ now|date:"H:i" }}</p>
+        </div>
+    </div>
+
+    <div class="activity-item">
+        <div class="activity-icon info">
+            <i class="bi bi-info-circle-fill"></i>
+        </div>
+        <div class="activity-text">
+            <p class="activity-title">Base de datos conectada</p>
+            <p class="activity-time">PostgreSQL - {{ usuarios_count|default:"0" }} usuarios</p>
+        </div>
+    </div>
+
+    <div class="activity-item">
+        <div class="activity-icon success">
+            <i class="bi bi-shield-check"></i>
+        </div>
+        <div class="activity-text">
+            <p class="activity-title">Sistema seguro y funcional</p>
+            <p class="activity-time">Todos los módulos operativos</p>
+        </div>
+    </div>
+</div>
+
+{% else %}
+
+<!-- DASHBOARD PARA NO-ADMIN -->
+<div class="card">
+    <h2 class="dashboard-title">Tu Perfil</h2>
+    <table class="table">
+        <tr>
+            <td><strong>Usuario:</strong></td>
+            <td>{{ current_user.usuario }}</td>
+        </tr>
+        <tr>
+            <td><strong>Nombre:</strong></td>
+            <td>{{ current_user.nombre|default:"No especificado" }}</td>
+        </tr>
+        <tr>
+            <td><strong>Rol:</strong></td>
+            <td>
+                {% if current_user.rol == 'tecnico' %}
+                    <span class="badge badge-primary">Técnico</span>
+                {% else %}
+                    <span class="badge badge-info">Productor</span>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Celular:</strong></td>
+            <td>{{ current_user.celular|default:"No especificado" }}</td>
+        </tr>
+        <tr>
+            <td><strong>Sector:</strong></td>
+            <td>{{ current_user.sector|default:"No especificado" }}</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3>
+        <i class="bi bi-construction"></i> En Construcción
+    </h3>
+    <p>Los módulos adicionales estarán disponibles próximamente para usuarios con rol de Técnico o Productor.</p>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Datos para el dashboard
+    const dashboardData = {
+        totalUsuarios: {{ total_usuarios|default:"0" }},
+        usuariosActivos: {{ usuarios_activos|default:"0" }},
+        usuariosInactivos: {{ usuarios_inactivos|default:"0" }}
+    };
+
+    console.log('Dashboard cargado:', dashboardData);
+</script>
+{% endblock %}

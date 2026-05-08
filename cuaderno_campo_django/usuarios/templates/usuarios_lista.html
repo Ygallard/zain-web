@@ -1,0 +1,517 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Usuarios - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .users-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        max-width: 520px;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #7f8c8d;
+    }
+
+    .search-box input {
+        padding-left: 2.4rem;
+    }
+
+    .table-users th,
+    .table-users td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .cards-mobile {
+        display: none;
+        gap: 1rem;
+    }
+
+    .user-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .user-card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .user-card-info {
+        font-size: 0.9rem;
+        color: #566573;
+        margin-bottom: 0.3rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .form-grid .full {
+        grid-column: 1 / -1;
+    }
+
+    .field-error {
+        color: #b42318;
+        font-size: 0.85rem;
+        margin-top: 0.35rem;
+        display: none;
+    }
+
+    .form-control.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+
+    @media (max-width: 992px) {
+        .table-users-wrap {
+            display: none;
+        }
+
+        .cards-mobile {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .users-toolbar {
+            align-items: stretch;
+        }
+
+        .users-toolbar .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-people-fill"></i> Gestión Usuarios</h1>
+</div>
+
+<div class="card">
+    <div class="users-toolbar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre, usuario, rut o sector" oninput="filterUsuarios()">
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openAddUserModal()">
+            <i class="bi bi-person-plus-fill"></i> Agregar Usuario
+        </button>
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users" id="usuariosTable">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Celular</th>
+                    <th>Sector</th>
+                    <th>Estado</th>
+                    <th>Fecha creación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr data-id="{{ usuario.id }}" data-search="{{ usuario.nombre|lower }} {{ usuario.usuario|lower }} {{ usuario.rut|lower }} {{ usuario.sector|default:''|lower }} {{ usuario.celular|default:''|lower }}">
+                    <td>
+                        <div class="user-name">{{ usuario.nombre }}</div>
+                        <small style="color:#7f8c8d;">{{ usuario.rut }}</small>
+                    </td>
+                    <td>{{ usuario.usuario }}</td>
+                    <td>
+                        {% if usuario.rol == 'admin' %}
+                            <span class="badge badge-admin">Administrador</span>
+                        {% elif usuario.rol == 'tecnico' %}
+                            <span class="badge badge-primary">Técnico</span>
+                        {% else %}
+                            <span class="badge badge-info">Productor</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ usuario.celular|default:'-' }}</td>
+                    <td>{{ usuario.sector|default:'-' }}</td>
+                    <td>
+                        {% if usuario.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ usuario.created_at|date:'d/m/Y H:i' }}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-primary" type="button" onclick="editUsuario({{ usuario.id }})">
+                            <i class="bi bi-pencil-fill"></i> Editar
+                        </button>
+                        <button class="btn btn-sm btn-secondary" type="button" onclick="toggleEstado({{ usuario.id }}, {{ usuario.estado|yesno:'true,false' }}, '{{ usuario.nombre|escapejs }}')">
+                            <i class="bi bi-person-x-fill"></i> {% if usuario.estado %}Desactivar{% else %}Activar{% endif %}
+                        </button>
+                        <button class="btn btn-sm btn-danger" type="button" onclick="deleteUsuario({{ usuario.id }}, '{{ usuario.nombre|escapejs }}')">
+                            <i class="bi bi-trash-fill"></i> Eliminar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay usuarios registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cards-mobile" id="usuariosCards">
+        {% for usuario in usuarios %}
+            <div class="user-card" data-search="{{ usuario.nombre|lower }} {{ usuario.usuario|lower }} {{ usuario.rut|lower }} {{ usuario.sector|default:''|lower }} {{ usuario.celular|default:''|lower }}">
+                <div class="user-card-head">
+                    <div>
+                        <div class="user-name">{{ usuario.nombre }}</div>
+                        <div class="user-card-info">{{ usuario.usuario }} - {{ usuario.rut }}</div>
+                    </div>
+                    <div>
+                        {% if usuario.rol == 'admin' %}
+                            <span class="badge badge-admin">Admin</span>
+                        {% elif usuario.rol == 'tecnico' %}
+                            <span class="badge badge-primary">Técnico</span>
+                        {% else %}
+                            <span class="badge badge-info">Productor</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="user-card-info"><strong>Celular:</strong> {{ usuario.celular|default:'-' }}</div>
+                <div class="user-card-info"><strong>Sector:</strong> {{ usuario.sector|default:'-' }}</div>
+                <div class="user-card-info"><strong>Estado:</strong> {% if usuario.estado %}Activo{% else %}Inactivo{% endif %}</div>
+                <div class="user-card-info"><strong>Creación:</strong> {{ usuario.created_at|date:'d/m/Y H:i' }}</div>
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editUsuario({{ usuario.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleEstado({{ usuario.id }}, {{ usuario.estado|yesno:'true,false' }}, '{{ usuario.nombre|escapejs }}')">
+                        <i class="bi bi-person-x-fill"></i> {% if usuario.estado %}Desactivar{% else %}Activar{% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteUsuario({{ usuario.id }}, '{{ usuario.nombre|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="userModal">
+    <div class="modal" style="max-width: 760px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="bi bi-person-gear"></i> <span id="modalTitle">Agregar Usuario</span></h2>
+            <button class="modal-close" type="button" onclick="closeUserModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="userForm" method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="user_id" id="userId">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="rut">RUT *</label>
+                        <input class="form-control" type="text" id="rut" name="rut" placeholder="12.345.678-9" required>
+                        <small class="field-error" id="error-rut"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="nombre">Nombre *</label>
+                        <input class="form-control" type="text" id="nombre" name="nombre" placeholder="Juan Pérez" required>
+                        <small class="field-error" id="error-nombre"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="usuario">Usuario *</label>
+                        <input class="form-control" type="text" id="usuario" name="usuario" placeholder="juanperez" required>
+                        <small class="field-error" id="error-usuario"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">Contraseña <span id="passwordRequired">*</span></label>
+                        <input class="form-control" type="password" id="password" name="password" minlength="6" required>
+                        <small class="field-error" id="error-password"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="rol">Rol *</label>
+                        <select class="form-control" id="rol" name="rol" required>
+                            <option value="">Selecciona un rol</option>
+                            <option value="admin">Administrador</option>
+                            <option value="tecnico">Técnico</option>
+                            <option value="productor">Productor</option>
+                        </select>
+                        <small class="field-error" id="error-rol"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="celular">Celular</label>
+                        <input class="form-control" type="tel" id="celular" name="celular" placeholder="+56912345678">
+                        <small class="field-error" id="error-celular"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="sector">Sector</label>
+                        <input class="form-control" type="text" id="sector" name="sector" placeholder="Sector Sur / Predio A">
+                        <small class="field-error" id="error-sector"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" style="display:flex; gap:0.6rem; align-items:center;">
+                            <input type="checkbox" id="estado" name="estado" checked>
+                            Usuario activo
+                        </label>
+                    </div>
+                </div>
+
+                <div id="formError" class="alert alert-danger" style="display:none; margin-top: 0.5rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span id="formErrorText"></span>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeUserModal()"><i class="bi bi-x-circle"></i> Cancelar</button>
+            <button class="btn btn-primary" type="button" id="saveUserBtn" onclick="saveUser()"><i class="bi bi-check-circle"></i> Guardar Usuario</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function csrfToken() {
+        return document.querySelector('#userForm input[name="csrfmiddlewaretoken"]').value;
+    }
+
+    function resetFieldErrors() {
+        document.querySelectorAll('#userForm .form-control').forEach((field) => {
+            field.classList.remove('is-invalid');
+        });
+        document.querySelectorAll('#userForm .field-error').forEach((el) => {
+            el.style.display = 'none';
+            el.textContent = '';
+        });
+        document.getElementById('formError').style.display = 'none';
+    }
+
+    function showFieldError(fieldName, message) {
+        const input = document.getElementById(fieldName);
+        const error = document.getElementById('error-' + fieldName);
+        if (input) {
+            input.classList.add('is-invalid');
+        }
+        if (error) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+    }
+
+    function showFormError(message) {
+        document.getElementById('formErrorText').textContent = message;
+        document.getElementById('formError').style.display = 'flex';
+    }
+
+    function openAddUserModal() {
+        resetFieldErrors();
+        document.getElementById('modalTitle').textContent = 'Agregar Usuario';
+        document.getElementById('userForm').reset();
+        document.getElementById('userId').value = '';
+        document.getElementById('password').required = true;
+        document.getElementById('passwordRequired').textContent = '*';
+        openModal('userModal');
+    }
+
+    function closeUserModal() {
+        closeModal('userModal');
+    }
+
+    async function editUsuario(id) {
+        resetFieldErrors();
+        const response = await fetch(`/usuarios/${id}/`);
+        const data = await response.json();
+
+        if (!data.success) {
+            showToast(data.error || 'No fue posible cargar el usuario.', 'error');
+            return;
+        }
+
+        const user = data.usuario;
+        document.getElementById('modalTitle').textContent = 'Editar Usuario';
+        document.getElementById('userId').value = user.id;
+        document.getElementById('rut').value = user.rut || '';
+        document.getElementById('nombre').value = user.nombre || '';
+        document.getElementById('usuario').value = user.usuario || '';
+        document.getElementById('password').value = '';
+        document.getElementById('password').required = false;
+        document.getElementById('passwordRequired').textContent = '';
+        document.getElementById('rol').value = user.rol || '';
+        document.getElementById('celular').value = user.celular || '';
+        document.getElementById('sector').value = user.sector || '';
+        document.getElementById('estado').checked = !!user.estado;
+
+        openModal('userModal');
+    }
+
+    async function saveUser() {
+        resetFieldErrors();
+
+        const form = document.getElementById('userForm');
+        const btn = document.getElementById('saveUserBtn');
+        const userId = document.getElementById('userId').value;
+        const url = userId ? `/usuarios/${userId}/editar/` : '/usuarios/crear/';
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken(),
+                },
+                body: formData,
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showToast(data.message || 'Usuario guardado correctamente.', 'success');
+                window.location.reload();
+                return;
+            }
+
+            if (data.errors) {
+                Object.entries(data.errors).forEach(([field, message]) => {
+                    if (field !== '__all__') {
+                        showFieldError(field, message);
+                    }
+                });
+                if (data.errors.__all__) {
+                    showFormError(data.errors.__all__);
+                }
+            }
+
+            if (!data.errors) {
+                showFormError(data.error || 'No fue posible guardar el usuario.');
+            }
+        } catch (error) {
+            showFormError('Ocurrió un error inesperado al guardar.');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function deleteUsuario(id, nombre) {
+        showConfirmModal(
+            'Eliminar usuario',
+            `Se eliminará el usuario ${nombre}. Esta acción no se puede deshacer.`,
+            async () => {
+                const response = await fetch(`/usuarios/${id}/eliminar/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken(),
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast(data.message || 'Usuario eliminado.', 'success');
+                    window.location.reload();
+                } else {
+                    showToast(data.error || 'No se pudo eliminar el usuario.', 'error');
+                }
+            },
+            'Eliminar',
+            'Cancelar'
+        );
+    }
+
+    function toggleEstado(id, estadoActual, nombre) {
+        const accion = estadoActual ? 'desactivar' : 'activar';
+        showConfirmModal(
+            `${accion.charAt(0).toUpperCase() + accion.slice(1)} usuario`,
+            `¿Deseas ${accion} a ${nombre}?`,
+            async () => {
+                const response = await fetch(`/usuarios/${id}/toggle-estado/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken(),
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast(data.message || 'Estado actualizado.', 'success');
+                    window.location.reload();
+                } else {
+                    showToast(data.error || 'No se pudo actualizar el estado.', 'error');
+                }
+            },
+            estadoActual ? 'Desactivar' : 'Activar',
+            'Cancelar'
+        );
+    }
+
+    function filterUsuarios() {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#usuariosTable tbody tr[data-search]');
+        const cards = document.querySelectorAll('#usuariosCards .user-card[data-search]');
+
+        rows.forEach((row) => {
+            row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+        });
+
+        cards.forEach((card) => {
+            card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+        });
+    }
+
+    document.getElementById('userModal').addEventListener('click', function (event) {
+        if (event.target === this) {
+            closeUserModal();
+        }
+    });
+</script>
+{% endblock %}

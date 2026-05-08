@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Cuaderno de Campo Digital{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="main-container">
+        <!-- NAVBAR -->
+        <nav class="navbar">
+            <div class="navbar-brand">
+                <i class="bi bi-book-half"></i>
+                Cuaderno de Campo Digital
+            </div>
+            <div class="navbar-user">
+                {% if current_user %}
+                    <div class="user-dropdown" id="userDropdown">
+                        <button class="user-trigger" type="button" id="userMenuButton" aria-haspopup="true" aria-expanded="false">
+                            <span class="avatar"><i class="bi bi-person-circle"></i></span>
+                            <span class="user-meta">
+                                <span class="username">{{ current_user.nombre }}</span>
+                                <span class="role">
+                                    {% if current_user.rol == 'admin' %}
+                                        Administrador
+                                    {% elif current_user.rol == 'tecnico' %}
+                                        Técnico
+                                    {% else %}
+                                        Productor
+                                    {% endif %}
+                                </span>
+                            </span>
+                            <i class="bi bi-chevron-down user-chevron"></i>
+                        </button>
+                        <div class="user-menu" id="userMenu" role="menu" aria-labelledby="userMenuButton">
+                            <button class="user-menu-item" type="button" onclick="alert('Mi perfil estará disponible próximamente.')">
+                                <i class="bi bi-person-lines-fill"></i>
+                                Mi perfil
+                            </button>
+                            <button class="user-menu-item" type="button" onclick="alert('Configuración estará disponible próximamente.')">
+                                <i class="bi bi-gear"></i>
+                                Configuración
+                            </button>
+                            <a href="{% url 'logout' %}" class="user-menu-item danger" role="menuitem">
+                                <i class="bi bi-box-arrow-right"></i>
+                                Cerrar sesión
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </nav>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <div class="content-wrapper">
+            <!-- SIDEBAR NAVIGATION -->
+            <aside class="sidebar">
+                <h3><i class="bi bi-list"></i> Menú</h3>
+                <ul class="sidebar-nav">
+                    <li><a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <i class="bi bi-house-fill"></i> Dashboard
+                    </a></li>
+                    {% if current_user and current_user.rol == 'admin' %}
+                        <li><a href="{% url 'usuarios_lista' %}" class="{% if request.resolver_match.url_name == 'usuarios_lista' %}active{% endif %}">
+                            <i class="bi bi-people-fill"></i> Gestión Usuarios
+                        </a></li>
+                    {% endif %}
+                    <li><a href="#" onclick="alert('Próximamente disponible')">
+                        <i class="bi bi-map-fill"></i> Predios
+                    </a></li>
+                    <li><a href="#" onclick="alert('Próximamente disponible')">
+                        <i class="bi bi-grid-3x3-gap"></i> Cuarteles
+                    </a></li>
+                    <li><a href="#" onclick="alert('Próximamente disponible')">
+                        <i class="bi bi-droplet-fill"></i> Riego
+                    </a></li>
+                    <li><a href="#" onclick="alert('Próximamente disponible')">
+                        <i class="bi bi-flower1"></i> Cosechas
+                    </a></li>
+                </ul>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <main class="main-content">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %}" role="alert">
+                            <i class="bi bi-info-circle"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'js/modal.js' %}"></script>
+    <script>
+        (function () {
+            const dropdown = document.getElementById('userDropdown');
+            const button = document.getElementById('userMenuButton');
+            const menu = document.getElementById('userMenu');
+
+            if (!dropdown || !button || !menu) {
+                return;
+            }
+
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                const isOpen = dropdown.classList.toggle('open');
+                button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            });
+
+            document.addEventListener('click', function () {
+                dropdown.classList.remove('open');
+                button.setAttribute('aria-expanded', 'false');
+            });
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

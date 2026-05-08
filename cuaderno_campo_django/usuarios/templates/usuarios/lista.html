@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuarios | Cuaderno de Campo{% endblock %}
+
+{% block content %}
+<div class="card card-soft">
+    <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <h4 class="mb-0">Gestion de usuarios</h4>
+            {% if current_user.rol == 'admin' %}
+            <a href="{% url 'usuarios_crear' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Crear usuario
+            </a>
+            {% endif %}
+        </div>
+
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-md-9">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por rut, nombre, usuario, rol o sector">
+            </div>
+            <div class="col-md-3 d-grid">
+                <button class="btn btn-outline-secondary" type="submit">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>RUT</th>
+                        <th>Nombre</th>
+                        <th>Usuario</th>
+                        <th>Rol</th>
+                        <th>Celular</th>
+                        <th>Sector</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr>
+                        <td>{{ u.id }}</td>
+                        <td>{{ u.rut }}</td>
+                        <td>{{ u.nombre }}</td>
+                        <td>{{ u.usuario }}</td>
+                        <td><span class="badge text-bg-info">{{ u.rol }}</span></td>
+                        <td>{{ u.celular|default:'-' }}</td>
+                        <td>{{ u.sector|default:'-' }}</td>
+                        <td>
+                            {% if u.estado %}
+                                <span class="badge text-bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary" href="{% url 'usuarios_detalle' u.id %}">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% if current_user.rol == 'admin' %}
+                            <a class="btn btn-sm btn-outline-warning" href="{% url 'usuarios_editar' u.id %}">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'usuarios_eliminar' u.id %}">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">No se encontraron usuarios.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

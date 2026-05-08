@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar usuario | Cuaderno de Campo{% endblock %}
+
+{% block content %}
+<div class="card card-soft">
+    <div class="card-body">
+        <h4 class="text-danger mb-3">Eliminar usuario</h4>
+        <p>Estas seguro de eliminar al usuario <strong>{{ usuario.nombre }}</strong> ({{ usuario.usuario }})?</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Si, eliminar</button>
+            <a href="{% url 'usuarios_lista' %}" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

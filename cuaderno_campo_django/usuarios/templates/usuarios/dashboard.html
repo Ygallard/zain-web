@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Cuaderno de Campo{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-12">
+        <div class="card card-soft">
+            <div class="card-body">
+                <h3 class="mb-1">Dashboard</h3>
+                <p class="text-muted mb-0">Hola {{ current_user.nombre }}. Rol activo: <strong>{{ current_user.rol }}</strong>.</p>
+            </div>
+        </div>
+    </div>
+
+    {% if current_user.rol == 'admin' %}
+    <div class="col-md-6">
+        <div class="card card-soft">
+            <div class="card-body">
+                <h6 class="text-muted">Total usuarios</h6>
+                <h2 class="mb-0">{{ total_usuarios }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card card-soft">
+            <div class="card-body">
+                <h6 class="text-muted">Usuarios activos</h6>
+                <h2 class="mb-0">{{ total_activos }}</h2>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if current_user.rol == 'productor' %}
+    <div class="col-12">
+        <div class="card card-soft">
+            <div class="card-body">
+                <h5>Mi informacion</h5>
+                <p class="mb-1"><strong>RUT:</strong> {{ current_user.rut }}</p>
+                <p class="mb-1"><strong>Celular:</strong> {{ current_user.celular|default:'-' }}</p>
+                <p class="mb-0"><strong>Sector:</strong> {{ current_user.sector|default:'-' }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
