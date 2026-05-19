@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Acceso denegado{% endblock %}
+
+{% block content %}
+<section class="card" style="max-width: 720px; margin: 2rem auto;">
+    <div class="card-header" style="display: flex; align-items: center; gap: 0.75rem;">
+        <i class="bi bi-shield-lock-fill" style="font-size: 1.4rem;"></i>
+        <h2 style="margin: 0;">Acceso denegado</h2>
+    </div>
+    <div class="card-body">
+        <p>No tienes permisos suficientes para acceder a este recurso.</p>
+        <p>Si crees que esto es un error, contacta a un administrador.</p>
+        <a class="btn btn-primary" href="{% url 'dashboard' %}">
+            <i class="bi bi-house-door-fill"></i> Volver al dashboard
+        </a>
+    </div>
+</section>
+{% endblock %}

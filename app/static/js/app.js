@@ -55,31 +55,133 @@ const templates = {
     `,
     cuaderno: `
         <div id="dashboard-cuaderno" class="dashboard active-dashboard">
-            <div class="card cuaderno-card">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                    <h2 class="dashboard-title mb-0">Cuaderno de Campo Digital</h2>
-                    <a href="http://127.0.0.1:8000/dashboard/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-box-arrow-up-right"></i> Abrir en nueva pestaña
-                    </a>
+            <div class="card cuaderno-welcome-card">
+                <div class="cuaderno-hero">
+                    <div>
+                        <h2 class="dashboard-title mb-2">Cuaderno de Campo</h2>
+                        <p class="cuaderno-hero-subtitle mb-2">
+                            Panel de bienvenida e informacion rapida para la gestion diaria del sistema.
+                        </p>
+                        <p class="cuaderno-institutional mb-0">Sistema desarrollado para gestion agricola y monitoreo inteligente.</p>
+                        <button id="btnOpenCuadernoDigital" class="btn btn-primary btn-sm mt-3" type="button">
+                            <i class="bi bi-box-arrow-in-right"></i> Ir al Cuaderno de Campo Digital
+                        </button>
+                    </div>
+                    <div class="cuaderno-hero-icon" aria-hidden="true">
+                        <i class="bi bi-journal-richtext"></i>
+                    </div>
                 </div>
-                <div class="cuaderno-embed-wrap">
-                    <iframe
-                        class="cuaderno-iframe"
-                        src="http://127.0.0.1:8000/dashboard/"
-                        title="Cuaderno de Campo"
-                        loading="lazy"
-                    ></iframe>
+
+                <div class="quick-metrics-grid">
+                    <div class="quick-metric-card">
+                        <i class="bi bi-people-fill"></i>
+                        <span class="quick-metric-label">Usuarios activos</span>
+                        <strong id="cuadernoMetricUsers" class="quick-metric-value">-</strong>
+                    </div>
+                    <div class="quick-metric-card">
+                        <i class="bi bi-geo-fill"></i>
+                        <span class="quick-metric-label">Predios registrados</span>
+                        <strong id="cuadernoMetricPredios" class="quick-metric-value">-</strong>
+                    </div>
+                    <div class="quick-metric-card">
+                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                        <span class="quick-metric-label">Cuarteles activos</span>
+                        <strong id="cuadernoMetricCuarteles" class="quick-metric-value">-</strong>
+                    </div>
+                    <div class="quick-metric-card">
+                        <i class="bi bi-clock-history"></i>
+                        <span class="quick-metric-label">Ultima actividad</span>
+                        <strong id="cuadernoMetricActividad" class="quick-metric-value metric-activity">-</strong>
+                    </div>
                 </div>
+
+                <div class="modules-grid">
+                    <article class="module-card"><i class="bi bi-person-badge"></i><h4>Gestion de Usuarios</h4><p>Administrar accesos y roles.</p></article>
+                    <article class="module-card"><i class="bi bi-geo-alt-fill"></i><h4>Predios</h4><p>Registrar campos agricolas.</p></article>
+                    <article class="module-card"><i class="bi bi-grid-fill"></i><h4>Cuarteles</h4><p>Organizar sectores de cultivo.</p></article>
+                    <article class="module-card"><i class="bi bi-droplet-half"></i><h4>Riego</h4><p>Controlar consumo de agua.</p></article>
+                    <article class="module-card"><i class="bi bi-flower1"></i><h4>Fertilizacion</h4><p>Registrar nutrientes aplicados.</p></article>
+                    <article class="module-card"><i class="bi bi-basket2-fill"></i><h4>Cosechas</h4><p>Registrar produccion agricola.</p></article>
+                    <article class="module-card"><i class="bi bi-shield-fill-check"></i><h4>Aplicaciones Quimicas</h4><p>Historial y control sanitario.</p></article>
+                    <article class="module-card"><i class="bi bi-file-earmark-spreadsheet-fill"></i><h4>Reportes</h4><p>Exportar PDF y Excel.</p></article>
+                </div>
+
+                <section class="quick-start-card">
+                    <h3><i class="bi bi-rocket-takeoff-fill"></i> Como comenzar?</h3>
+                    <ol>
+                        <li>Crear predio</li>
+                        <li>Crear cuarteles</li>
+                        <li>Registrar riegos</li>
+                        <li>Registrar fertilizacion</li>
+                        <li>Registrar cosechas</li>
+                        <li>Generar reportes</li>
+                    </ol>
+                </section>
             </div>
         </div>
     `
 };
+
+function setCuadernoMetric(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        return;
+    }
+
+    element.textContent = value ?? '-';
+}
+
+function formatLastActivity(activity) {
+    if (!activity) {
+        return 'Sin actividad reciente';
+    }
+
+    const userName = activity.usuario || 'Usuario';
+    const moduleName = activity.modulo || 'sistema';
+    const actionName = activity.accion || 'actualizacion';
+    return `${userName} - ${moduleName} - ${actionName}`;
+}
+
+async function initializeCuadernoView() {
+    const buttonOpenCuaderno = document.getElementById('btnOpenCuadernoDigital');
+    if (buttonOpenCuaderno) {
+        buttonOpenCuaderno.addEventListener('click', function () {
+            const newWindow = window.open(getCuadernoUrl(), '_blank', 'noopener');
+            if (newWindow) {
+                newWindow.opener = null;
+            }
+        });
+    }
+
+    setCuadernoMetric('cuadernoMetricUsers', '-');
+    setCuadernoMetric('cuadernoMetricPredios', '-');
+    setCuadernoMetric('cuadernoMetricCuarteles', '-');
+    setCuadernoMetric('cuadernoMetricActividad', 'Cargando...');
+
+    try {
+        const response = await fetch('/api/cuaderno/quick-stats');
+        const payload = await response.json();
+
+        if (!payload.success || !payload.data) {
+            throw new Error('Sin datos de metricas');
+        }
+
+        const data = payload.data;
+        setCuadernoMetric('cuadernoMetricUsers', data.usuarios_activos ?? '-');
+        setCuadernoMetric('cuadernoMetricPredios', data.predios_registrados ?? '-');
+        setCuadernoMetric('cuadernoMetricCuarteles', data.cuarteles_activos ?? '-');
+        setCuadernoMetric('cuadernoMetricActividad', formatLastActivity(data.ultima_actividad));
+    } catch (error) {
+        setCuadernoMetric('cuadernoMetricActividad', 'No disponible');
+    }
+}
 
 // Estado de la aplicación
 const appState = {
     currentView: 'inicio',
     authenticated: false,
     username: null,
+    ssoUrl: null,
     loadingStates: {
         weather: false,
         visits: false,
@@ -97,7 +199,7 @@ function renderAuthRequiredView() {
             <div class="card" style="max-width: 520px; margin: 2rem auto; text-align: center;">
                 <h3><i class="bi bi-shield-lock-fill"></i> Acceso requerido</h3>
                 <div class="card-content">
-                    <p style="color: #6c757d; margin-bottom: 1rem;">Inicia sesión para ver el dashboard.</p>
+                    <p style="color: #6c757d; margin-bottom: 1rem;">Inicia sesión para acceder al Cuaderno de Campo.</p>
                     <button id="btn-open-login-content" class="btn btn-primary">
                         <i class="bi bi-box-arrow-in-right"></i> Iniciar sesión
                     </button>
@@ -112,19 +214,48 @@ function updateAuthUI() {
     const btnOpenLogin = document.getElementById('btn-open-login');
     const btnLogout = document.getElementById('btn-logout');
 
-    if (!userLabel || !btnOpenLogin || !btnLogout) {
+    if (!btnOpenLogin || !btnLogout) {
         return;
     }
 
     if (appState.authenticated) {
-        userLabel.textContent = `Usuario: ${appState.username || 'admin'}`;
+        const userName = appState.user?.nombre || appState.username || 'Usuario';
+        const userRole = appState.user?.rol || '';
+        const roleLabel = getRoleLabel(userRole);
+        if (userLabel) {
+            userLabel.textContent = `${userName}${roleLabel ? ' (' + roleLabel + ')' : ''}`;
+        }
         btnOpenLogin.style.display = 'none';
         btnLogout.style.display = 'block';
+        
+        // Mostrar botón para ir al Cuaderno de Campo (solo para admin y tecnico)
+        updateCuadernoNavButton();
     } else {
-        userLabel.textContent = 'Sin sesión';
+        if (userLabel) {
+            userLabel.textContent = 'Sin sesión';
+        }
         btnOpenLogin.style.display = 'block';
         btnLogout.style.display = 'none';
     }
+}
+
+function getRoleLabel(role) {
+    const roleMap = {
+        'admin': 'Administrador',
+        'tecnico': 'Técnico',
+        'productor': 'Productor'
+    };
+    return roleMap[role] || role;
+}
+
+function updateCuadernoNavButton() {
+    // Botón deshabilitado: el acceso al Cuaderno se realiza desde el ítem del menú lateral
+    const existing = document.getElementById('btn-cuaderno-nav');
+    if (existing) existing.remove();
+}
+
+function getCuadernoUrl() {
+    return appState.ssoUrl || 'http://127.0.0.1:8000/dashboard/';
 }
 
 async function refreshAuthStatus() {
@@ -133,10 +264,20 @@ async function refreshAuthStatus() {
         const data = await response.json();
 
         appState.authenticated = !!data.authenticated;
-        appState.username = data.username || null;
+        if (data.user) {
+            appState.user = data.user;
+            appState.username = data.user.username || data.user.nombre || null;
+            appState.ssoUrl = data.sso_url || null;
+        } else {
+            appState.username = null;
+            appState.user = {};
+            appState.ssoUrl = null;
+        }
     } catch (error) {
         appState.authenticated = false;
         appState.username = null;
+        appState.user = {};
+        appState.ssoUrl = null;
         console.error('No se pudo validar la sesión:', error);
     }
 
@@ -189,18 +330,31 @@ async function handleLogin(event) {
             body: JSON.stringify({ username, password })
         });
 
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        const rawBody = await response.text();
+        const data = contentType.includes('application/json') ? JSON.parse(rawBody) : null;
 
         if (!response.ok || !data.success) {
-            throw new Error(data.error || 'No se pudo iniciar sesión');
+            const fallbackError = response.ok
+                ? 'No se pudo iniciar sesión'
+                : 'Error de autenticación. Verifica tus credenciales.';
+            throw new Error((data && data.error) || fallbackError);
         }
 
+        // Guardar datos completos en appState
         appState.authenticated = true;
-        appState.username = data.username;
+        appState.username = data.user?.username || data.user?.nombre || '';
+        appState.user = data.user || {};
+        appState.ssoUrl = data.sso_url || null;
+        
         updateAuthUI();
 
         const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
         if (loginModal) loginModal.hide();
+
+        // Limpiar campos
+        if (usernameInput) usernameInput.value = '';
+        if (passwordInput) passwordInput.value = '';
 
         $('#inicio').addClass('options-active');
         $('#informes').removeClass('options-active');
@@ -210,6 +364,7 @@ async function handleLogin(event) {
             loginError.textContent = error.message;
             loginError.style.display = 'block';
         }
+        console.error('Error en login:', error);
     }
 }
 
@@ -222,12 +377,14 @@ async function handleLogout() {
 
     appState.authenticated = false;
     appState.username = null;
+    appState.ssoUrl = null;
     updateAuthUI();
     stopRealtimeFlowMonitor();
 
     const contentDiv = document.getElementById('dynamic-content');
     if (contentDiv) {
-        contentDiv.innerHTML = renderAuthRequiredView();
+        contentDiv.innerHTML = templates.inicio;
+        initializeHomeView();
         bindAuthActions();
     }
 }
@@ -295,7 +452,9 @@ async function loadView(viewName) {
         const contentDiv = document.getElementById('dynamic-content');
         const mainOverlay = document.getElementById('main-loading-overlay');
 
-        if (!appState.authenticated) {
+        const requiresAuth = viewName === 'cuaderno';
+
+        if (requiresAuth && !appState.authenticated) {
             contentDiv.innerHTML = renderAuthRequiredView();
             bindAuthActions();
             return;
@@ -325,7 +484,7 @@ async function loadView(viewName) {
         } else if (viewName === 'informes') {
             await initializeReportsView();
         } else if (viewName === 'cuaderno') {
-            // Vista embebida, no requiere inicialización adicional
+            await initializeCuadernoView();
         }
     } catch (error) {
         console.error("Error al cargar la vista:", error);
@@ -1254,51 +1413,77 @@ $(document).ready(function() {
     // Activar el ítem inicial del menú
     $("#inicio").addClass("options-active");
 
+    const appSidebarToggle = $('#appSidebarToggle');
+    const appSidebarOverlay = $('#appSidebarOverlay');
+
+    function isMobileSidebarViewport() {
+        return window.matchMedia('(max-width: 768px)').matches;
+    }
+
+    function closeAppSidebar() {
+        $('body').removeClass('app-sidebar-open');
+        appSidebarToggle.attr('aria-expanded', 'false');
+    }
+
+    function toggleAppSidebar() {
+        if (!isMobileSidebarViewport()) {
+            return;
+        }
+        const isOpen = !$('body').hasClass('app-sidebar-open');
+        $('body').toggleClass('app-sidebar-open', isOpen);
+        appSidebarToggle.attr('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
+    appSidebarToggle.on('click', toggleAppSidebar);
+    appSidebarOverlay.on('click', closeAppSidebar);
+
+    $(document).on('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeAppSidebar();
+        }
+    });
+
     bindAuthActions();
 
     refreshAuthStatus().then(() => {
-        if (appState.authenticated) {
-            loadView('inicio');
-        } else {
-            const contentDiv = document.getElementById('dynamic-content');
-            if (contentDiv) {
-                contentDiv.innerHTML = renderAuthRequiredView();
-            }
-            bindAuthActions();
-
-            const mainOverlay = document.getElementById('main-loading-overlay');
-            if (mainOverlay) {
-                mainOverlay.classList.remove('active');
-                setTimeout(() => {
-                    mainOverlay.remove();
-                }, 300);
-            }
-        }
+        loadView('inicio');
+    }).catch(() => {
+        loadView('inicio');
     });
+
+    const mainOverlay = document.getElementById('main-loading-overlay');
+    if (mainOverlay) {
+        mainOverlay.classList.remove('active');
+        setTimeout(() => {
+            mainOverlay.remove();
+        }, 300);
+    }
 
     // Manejador de eventos para todos los items del menú
     $(".menu-item").click(function(e) {
         e.preventDefault();
 
-        if (!appState.authenticated) {
+        const viewName = $(this).data('view');
+
+        if (viewName === 'cuaderno' && !appState.authenticated) {
             showLoginModal();
+            closeAppSidebar();
             return;
         }
         
         // Si ya está activo, no hacer nada
         if ($(this).hasClass('options-active')) {
+            closeAppSidebar();
             return;
         }
 
-        // Obtener la vista a cargar
-        const viewName = $(this).data('view');
-        
         // Actualizar clases activas
         $(".options-active").removeClass("options-active");
         $(this).addClass("options-active");
         
         // Cargar la vista
         loadView(viewName);
+        closeAppSidebar();
     });
     
     // Detectar cambio de orientación o tamaño de ventana
@@ -1306,6 +1491,9 @@ $(document).ready(function() {
     $(window).on('resize orientationchange', function() {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function() {
+            if (!isMobileSidebarViewport()) {
+                closeAppSidebar();
+            }
             // Si estamos en la vista de informes, recargar para adaptar el layout
             if (appState.currentView === 'informes') {
                 initializeReportsView();

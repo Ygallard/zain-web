@@ -1,0 +1,641 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Predios - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .users-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        max-width: 520px;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #7f8c8d;
+    }
+
+    .search-box input {
+        padding-left: 2.4rem;
+    }
+
+    .table-users th,
+    .table-users td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .cards-mobile {
+        display: none;
+        gap: 1rem;
+    }
+
+    .user-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .user-card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .user-card-info {
+        font-size: 0.9rem;
+        color: #566573;
+        margin-bottom: 0.3rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .form-grid .full {
+        grid-column: 1 / -1;
+    }
+
+    .field-error {
+        color: #b42318;
+        font-size: 0.85rem;
+        margin-top: 0.35rem;
+        display: none;
+    }
+
+    .form-control.is-invalid,
+    .form-select.is-invalid,
+    .form-check-input.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+
+    @media (max-width: 992px) {
+        .table-users-wrap {
+            display: none;
+        }
+
+        .cards-mobile {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .users-toolbar {
+            align-items: stretch;
+        }
+
+        .users-toolbar .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-map-fill"></i> Gestión de Predios</h1>
+</div>
+
+<div class="card">
+    <div class="users-toolbar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, ubicación, usuario o estado" oninput="filterPredios()">
+        </div>
+        {% if can_manage %}
+            <button type="button" class="btn btn-primary" onclick="openAddPredioModal()">
+                <i class="bi bi-plus-circle-fill"></i> Agregar Predio
+            </button>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users" id="prediosTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre Predio</th>
+                    <th>Ubicación</th>
+                    <th>Superficie</th>
+                    <th>Estado</th>
+                    {% if can_manage %}<th>Acciones</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody id="prediosTableBody">
+                {% for predio in predios %}
+                <tr data-id="{{ predio.id }}" data-search="{{ predio.nombre_predio|lower }} {{ predio.ubicacion|default:''|lower }} {{ predio.usuario.nombre|lower }} {{ predio.usuario.usuario|lower }} {% if predio.estado %}activo{% else %}inactivo{% endif %}">
+                    <td>{{ predio.id }}</td>
+                    <td>
+                        <div class="user-name">{{ predio.nombre_predio }}</div>
+                        <small style="color:#7f8c8d;">{{ predio.usuario.nombre }}</small>
+                    </td>
+                    <td>{{ predio.ubicacion|default:'-' }}</td>
+                    <td>{{ predio.superficie|default:'-' }}</td>
+                    <td>
+                        {% if predio.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    {% if can_manage %}
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-primary" type="button" onclick="editPredio({{ predio.id }})">
+                                <i class="bi bi-pencil-fill"></i> Editar
+                            </button>
+                            <button class="btn btn-sm btn-secondary" type="button" onclick="togglePredioEstado({{ predio.id }}, {{ predio.estado|yesno:'true,false' }}, '{{ predio.nombre_predio|escapejs }}')">
+                                <i class="bi bi-slash-circle-fill"></i> {% if predio.estado %}Desactivar{% else %}Activar{% endif %}
+                            </button>
+                            <button class="btn btn-sm btn-danger" type="button" onclick="deletePredio({{ predio.id }}, '{{ predio.nombre_predio|escapejs }}')">
+                                <i class="bi bi-trash-fill"></i> Eliminar
+                            </button>
+                        </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr id="prediosEmptyRow">
+                    <td colspan="{% if can_manage %}6{% else %}5{% endif %}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay predios registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cards-mobile" id="prediosCards">
+        {% for predio in predios %}
+        <div class="user-card" data-id="{{ predio.id }}" data-search="{{ predio.nombre_predio|lower }} {{ predio.ubicacion|default:''|lower }} {{ predio.usuario.nombre|lower }} {{ predio.usuario.usuario|lower }} {% if predio.estado %}activo{% else %}inactivo{% endif %}">
+            <div class="user-card-head">
+                <div>
+                    <div class="user-name">{{ predio.nombre_predio }}</div>
+                    <div class="user-card-info">{{ predio.usuario.nombre }}</div>
+                </div>
+                <div>
+                    {% if predio.estado %}
+                        <span class="badge badge-success">Activo</span>
+                    {% else %}
+                        <span class="badge badge-warning">Inactivo</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="user-card-info"><strong>ID:</strong> {{ predio.id }}</div>
+            <div class="user-card-info"><strong>Ubicación:</strong> {{ predio.ubicacion|default:'-' }}</div>
+            <div class="user-card-info"><strong>Superficie:</strong> {{ predio.superficie|default:'-' }}</div>
+            {% if can_manage %}
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editPredio({{ predio.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="togglePredioEstado({{ predio.id }}, {{ predio.estado|yesno:'true,false' }}, '{{ predio.nombre_predio|escapejs }}')">
+                        <i class="bi bi-slash-circle-fill"></i> {% if predio.estado %}Desactivar{% else %}Activar{% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deletePredio({{ predio.id }}, '{{ predio.nombre_predio|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if can_manage %}
+    <div class="modal-overlay" id="predioModal">
+        <div class="modal" style="max-width: 760px;">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="bi bi-map"></i> <span id="modalTitle">Agregar Predio</span></h2>
+                <button class="modal-close" type="button" onclick="closePredioModal()"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="predioForm" method="post" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" name="predio_id" id="predioId">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="usuario">Usuario *</label>
+                        <select class="form-control" id="usuario" name="usuario" required>
+                            <option value="">Selecciona un usuario</option>
+                            {% for usuario in usuarios_activos %}
+                                <option value="{{ usuario.id }}">{{ usuario.nombre }} ({{ usuario.usuario }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="field-error" id="error-usuario"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="nombre_predio">Nombre Predio *</label>
+                        <input class="form-control" type="text" id="nombre_predio" name="nombre_predio" placeholder="Predio Santa Marta" required>
+                        <small class="field-error" id="error-nombre_predio"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="ubicacion">Ubicación</label>
+                        <input class="form-control" type="text" id="ubicacion" name="ubicacion" placeholder="San Vicente, Región de O'Higgins">
+                        <small class="field-error" id="error-ubicacion"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="superficie">Superficie</label>
+                        <input class="form-control" type="number" id="superficie" name="superficie" min="0" step="0.01" placeholder="12.50">
+                        <small class="field-error" id="error-superficie"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="descripcion">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="4" placeholder="Descripción general del predio"></textarea>
+                        <small class="field-error" id="error-descripcion"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" style="display:flex; gap:0.6rem; align-items:center;">
+                            <input type="checkbox" id="estado" name="estado" checked>
+                            Predio activo
+                        </label>
+                    </div>
+                </div>
+
+                <div id="formError" class="alert alert-danger" style="display:none; margin-top: 0.5rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span id="formErrorText"></span>
+                </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closePredioModal()"><i class="bi bi-x-circle"></i> Cancelar</button>
+                <button class="btn btn-primary" type="button" id="savePredioBtn" onclick="savePredio()"><i class="bi bi-check-circle"></i> Guardar Predio</button>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const CAN_MANAGE_PREDIOS = {{ can_manage|yesno:'true,false' }};
+
+    function csrfToken() {
+        return document.querySelector('#predioForm input[name="csrfmiddlewaretoken"]').value;
+    }
+
+    function predioSearchText(predio) {
+        return [
+            predio.nombre_predio || '',
+            predio.ubicacion || '',
+            predio.usuario_nombre || '',
+            predio.usuario_label || '',
+            predio.estado ? 'activo' : 'inactivo'
+        ].join(' ').toLowerCase();
+    }
+
+    function formatSuperficie(superficie) {
+        return superficie ? superficie : '-';
+    }
+
+    function estadoBadge(estado) {
+        return estado
+            ? '<span class="badge badge-success">Activo</span>'
+            : '<span class="badge badge-warning">Inactivo</span>';
+    }
+
+    function toggleLabel(estado) {
+        return estado ? 'Desactivar' : 'Activar';
+    }
+
+    function resetFieldErrors() {
+        document.querySelectorAll('#predioForm .form-control').forEach((field) => {
+            field.classList.remove('is-invalid');
+        });
+        document.querySelectorAll('#predioForm .field-error').forEach((el) => {
+            el.style.display = 'none';
+            el.textContent = '';
+        });
+        document.getElementById('formError').style.display = 'none';
+    }
+
+    function showFieldError(fieldName, message) {
+        const input = document.getElementById(fieldName);
+        const error = document.getElementById('error-' + fieldName);
+        if (input) {
+            input.classList.add('is-invalid');
+        }
+        if (error) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+    }
+
+    function showFormError(message) {
+        document.getElementById('formErrorText').textContent = message;
+        document.getElementById('formError').style.display = 'flex';
+    }
+
+    function openAddPredioModal() {
+        resetFieldErrors();
+        document.getElementById('modalTitle').textContent = 'Agregar Predio';
+        document.getElementById('predioForm').reset();
+        document.getElementById('predioId').value = '';
+        document.getElementById('estado').checked = true;
+        openModal('predioModal');
+    }
+
+    function closePredioModal() {
+        closeModal('predioModal');
+    }
+
+    async function editPredio(id) {
+        resetFieldErrors();
+        const response = await fetch(`/predios/${id}/`);
+        const data = await response.json();
+
+        if (!data.success) {
+            showToast(data.error || 'No fue posible cargar el predio.', 'error');
+            return;
+        }
+
+        const predio = data.predio;
+        document.getElementById('modalTitle').textContent = 'Editar Predio';
+        document.getElementById('predioId').value = predio.id;
+        document.getElementById('usuario').value = predio.usuario_id || '';
+        document.getElementById('nombre_predio').value = predio.nombre_predio || '';
+        document.getElementById('ubicacion').value = predio.ubicacion || '';
+        document.getElementById('superficie').value = predio.superficie || '';
+        document.getElementById('descripcion').value = predio.descripcion || '';
+        document.getElementById('estado').checked = !!predio.estado;
+
+        openModal('predioModal');
+    }
+
+    function renderPredioRow(predio) {
+        const acciones = CAN_MANAGE_PREDIOS
+            ? `
+                <td class="actions-cell">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editPredio(${predio.id})">
+                        <i class="bi bi-pencil-fill"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="togglePredioEstado(${predio.id}, ${predio.estado}, '${predio.nombre_predio.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(predio.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deletePredio(${predio.id}, '${predio.nombre_predio.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-trash-fill"></i> Eliminar
+                    </button>
+                </td>
+            `
+            : '';
+
+        return `
+            <tr data-id="${predio.id}" data-search="${predioSearchText(predio)}">
+                <td>${predio.id}</td>
+                <td>
+                    <div class="user-name">${predio.nombre_predio}</div>
+                    <small style="color:#7f8c8d;">${predio.usuario_nombre}</small>
+                </td>
+                <td>${predio.ubicacion || '-'}</td>
+                <td>${formatSuperficie(predio.superficie)}</td>
+                <td>${estadoBadge(predio.estado)}</td>
+                ${acciones}
+            </tr>
+        `;
+    }
+
+    function renderPredioCard(predio) {
+        const acciones = CAN_MANAGE_PREDIOS
+            ? `
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editPredio(${predio.id})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="togglePredioEstado(${predio.id}, ${predio.estado}, '${predio.nombre_predio.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(predio.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deletePredio(${predio.id}, '${predio.nombre_predio.replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            `
+            : '';
+
+        return `
+            <div class="user-card" data-id="${predio.id}" data-search="${predioSearchText(predio)}">
+                <div class="user-card-head">
+                    <div>
+                        <div class="user-name">${predio.nombre_predio}</div>
+                        <div class="user-card-info">${predio.usuario_nombre}</div>
+                    </div>
+                    <div>${estadoBadge(predio.estado)}</div>
+                </div>
+                <div class="user-card-info"><strong>ID:</strong> ${predio.id}</div>
+                <div class="user-card-info"><strong>Ubicación:</strong> ${predio.ubicacion || '-'}</div>
+                <div class="user-card-info"><strong>Superficie:</strong> ${formatSuperficie(predio.superficie)}</div>
+                ${acciones}
+            </div>
+        `;
+    }
+
+    function removeEmptyState() {
+        const emptyRow = document.getElementById('prediosEmptyRow');
+        if (emptyRow) {
+            emptyRow.remove();
+        }
+    }
+
+    function upsertPredioInDom(predio) {
+        removeEmptyState();
+
+        const tbody = document.getElementById('prediosTableBody');
+        const cards = document.getElementById('prediosCards');
+        const rowMarkup = renderPredioRow(predio);
+        const cardMarkup = renderPredioCard(predio);
+        const existingRow = tbody.querySelector(`tr[data-id="${predio.id}"]`);
+        const existingCard = cards.querySelector(`.user-card[data-id="${predio.id}"]`);
+
+        if (existingRow) {
+            existingRow.outerHTML = rowMarkup;
+        } else {
+            tbody.insertAdjacentHTML('afterbegin', rowMarkup);
+        }
+
+        if (existingCard) {
+            existingCard.outerHTML = cardMarkup;
+        } else {
+            cards.insertAdjacentHTML('afterbegin', cardMarkup);
+        }
+
+        filterPredios();
+    }
+
+    function removePredioFromDom(id) {
+        const row = document.querySelector(`#prediosTableBody tr[data-id="${id}"]`);
+        const card = document.querySelector(`#prediosCards .user-card[data-id="${id}"]`);
+        if (row) {
+            row.remove();
+        }
+        if (card) {
+            card.remove();
+        }
+
+        const rows = document.querySelectorAll('#prediosTableBody tr[data-id]');
+        if (!rows.length) {
+            const colspan = CAN_MANAGE_PREDIOS ? 6 : 5;
+            document.getElementById('prediosTableBody').innerHTML = `<tr id="prediosEmptyRow"><td colspan="${colspan}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay predios registrados.</td></tr>`;
+        }
+    }
+
+    async function savePredio() {
+        resetFieldErrors();
+
+        const form = document.getElementById('predioForm');
+        const btn = document.getElementById('savePredioBtn');
+        const predioId = document.getElementById('predioId').value;
+        const url = predioId ? `/predios/${predioId}/editar/` : '/predios/crear/';
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken(),
+                },
+                body: formData,
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                upsertPredioInDom(data.predio);
+                closePredioModal();
+                showToast(data.message || 'Predio guardado correctamente.', 'success');
+                return;
+            }
+
+            if (data.errors) {
+                Object.entries(data.errors).forEach(([field, message]) => {
+                    if (field !== '__all__') {
+                        showFieldError(field, message);
+                    }
+                });
+                if (data.errors.__all__) {
+                    showFormError(data.errors.__all__);
+                }
+            }
+
+            if (!data.errors) {
+                showFormError(data.error || 'No fue posible guardar el predio.');
+            }
+        } catch (error) {
+            showFormError('Ocurrió un error inesperado al guardar.');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function deletePredio(id, nombre) {
+        showConfirmModal(
+            'Eliminar predio',
+            `Se eliminará el predio ${nombre}. Esta acción no se puede deshacer.`,
+            async () => {
+                const response = await fetch(`/predios/${id}/eliminar/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken(),
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    removePredioFromDom(id);
+                    showToast(data.message || 'Predio eliminado.', 'success');
+                } else {
+                    showToast(data.error || 'No se pudo eliminar el predio.', 'error');
+                }
+            },
+            'Eliminar',
+            'Cancelar'
+        );
+    }
+
+    function togglePredioEstado(id, estadoActual, nombre) {
+        const accion = estadoActual ? 'desactivar' : 'activar';
+        showConfirmModal(
+            `${accion.charAt(0).toUpperCase() + accion.slice(1)} predio`,
+            `¿Deseas ${accion} ${nombre}?`,
+            async () => {
+                const response = await fetch(`/predios/${id}/toggle-estado/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken(),
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const detailResponse = await fetch(`/predios/${id}/`);
+                    const detailData = await detailResponse.json();
+                    if (detailData.success) {
+                        upsertPredioInDom(detailData.predio);
+                    }
+                    showToast(data.message || 'Estado actualizado.', 'success');
+                } else {
+                    showToast(data.error || 'No se pudo actualizar el estado.', 'error');
+                }
+            },
+            estadoActual ? 'Desactivar' : 'Activar',
+            'Cancelar'
+        );
+    }
+
+    function filterPredios() {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#prediosTableBody tr[data-search]');
+        const cards = document.querySelectorAll('#prediosCards .user-card[data-search]');
+
+        rows.forEach((row) => {
+            row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+        });
+
+        cards.forEach((card) => {
+            card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+        });
+    }
+
+    const predioModal = document.getElementById('predioModal');
+    if (predioModal) {
+        predioModal.addEventListener('click', function (event) {
+            if (event.target === this) {
+                closePredioModal();
+            }
+        });
+    }
+</script>
+{% endblock %}

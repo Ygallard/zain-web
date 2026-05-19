@@ -1,0 +1,1038 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Aplicaciones Químicas - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .stat-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+    }
+
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .stat-icon.primary {
+        background-color: rgba(52, 152, 219, 0.12);
+        color: #3498db;
+    }
+
+    .stat-icon.success {
+        background-color: rgba(46, 204, 113, 0.12);
+        color: #2ecc71;
+    }
+
+    .stat-icon.warning {
+        background-color: rgba(241, 196, 15, 0.12);
+        color: #f1c40f;
+    }
+
+    .stat-icon.info {
+        background-color: rgba(26, 188, 156, 0.12);
+        color: #16a085;
+    }
+
+    .stat-content h3 {
+        margin: 0;
+        line-height: 1;
+        color: var(--primary-color);
+        font-size: 1.5rem;
+    }
+
+    .stat-content p {
+        margin: 0.35rem 0 0;
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+
+    .users-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .chart-card {
+        background: #fff;
+        border: 1px solid #e8edf2;
+        border-radius: 10px;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .chart-title {
+        margin: 0 0 0.8rem;
+        color: var(--primary-color);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .chart-wrap {
+        position: relative;
+        width: 100%;
+        min-height: 260px;
+        max-height: 320px;
+    }
+
+    .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        max-width: 520px;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #7f8c8d;
+    }
+
+    .search-box input {
+        padding-left: 2.4rem;
+    }
+
+    .table-users th,
+    .table-users td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .cards-mobile {
+        display: none;
+        gap: 1rem;
+    }
+
+    .user-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .user-card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .user-card-info {
+        font-size: 0.9rem;
+        color: #566573;
+        margin-bottom: 0.3rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .form-grid .full {
+        grid-column: 1 / -1;
+    }
+
+    .field-error {
+        color: #b42318;
+        font-size: 0.85rem;
+        margin-top: 0.35rem;
+        display: none;
+    }
+
+    .form-control.is-invalid,
+    .form-select.is-invalid,
+    .form-check-input.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+
+    @media (max-width: 992px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .table-users-wrap {
+            display: none;
+        }
+
+        .cards-mobile {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .users-toolbar {
+            align-items: stretch;
+        }
+
+        .users-toolbar .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    {% if request.resolver_match.url_name == 'aplicaciones_quimicas_analitica' %}
+    <h1 class="page-title"><i class="bi bi-graph-up-arrow"></i> Analítica de Aplicaciones Químicas</h1>
+    {% else %}
+    <h1 class="page-title"><i class="bi bi-bezier2"></i> Gestión de Aplicaciones Químicas</h1>
+    {% endif %}
+</div>
+
+{% if request.resolver_match.url_name == 'aplicaciones_quimicas_analitica' %}
+{% include 'partials/analytics_filters.html' with analytics_description='Vista enfocada en tendencias, comparativas de producto y comportamiento histórico de aplicaciones.' analytics_gestion_url='aplicaciones_quimicas_lista' %}
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title"><i class="bi bi-box-seam"></i> Productos más utilizados</h3>
+        <div class="chart-wrap"><canvas id="aqProductosChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3 class="chart-title"><i class="bi bi-grid-3x3-gap"></i> Cuarteles tratados</h3>
+        <div class="chart-wrap"><canvas id="aqCuartelesChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="grid-column: 1 / -1;">
+        <h3 class="chart-title"><i class="bi bi-calendar3"></i> Aplicaciones por período (12 meses)</h3>
+        <div class="chart-wrap"><canvas id="aqMensualChart"></canvas></div>
+    </div>
+</div>
+
+<div class="analytics-ranking-card">
+    <h3 class="chart-title"><i class="bi bi-table"></i> Ranking analítico</h3>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="aqRankingBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if request.resolver_match.url_name == 'aplicaciones_quimicas_lista' %}
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-icon primary"><i class="bi bi-clipboard2-check"></i></div>
+        <div class="stat-content">
+            <h3 id="cardTotalAplicaciones">{{ resumen.total_aplicaciones }}</h3>
+            <p>Total aplicaciones</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon success"><i class="bi bi-box-seam-fill"></i></div>
+        <div class="stat-content">
+            <h3 id="cardProductosUtilizados">{{ resumen.productos_utilizados }}</h3>
+            <p>Productos utilizados</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon warning"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+        <div class="stat-content">
+            <h3 id="cardCuartelesTratados">{{ resumen.cuarteles_tratados }}</h3>
+            <p>Cuarteles tratados</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="bi bi-calendar-check"></i></div>
+        <div class="stat-content">
+            <h3 id="cardUltimaAplicacion" style="font-size:1rem; line-height:1.2;">{{ resumen.ultima_aplicacion }}</h3>
+            <p>Última aplicación</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if request.resolver_match.url_name == 'aplicaciones_quimicas_lista' %}
+<div class="card">
+    <div class="users-toolbar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, cuartel, producto, tipo, responsable o estado" oninput="filterFertilizaciones()">
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openAddFertilizacionModal()">
+            <i class="bi bi-plus-circle-fill"></i> Agregar Aplicación
+        </button>
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users" id="fertilizacionesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Predio</th>
+                    <th>Cuartel</th>
+                    <th>Fecha Aplicación</th>
+                    <th>Producto</th>
+                    <th>Tipo Producto</th>
+                    <th>Dosis</th>
+                    <th>Unidad</th>
+                    <th>Método Aplicación</th>
+                    <th>Responsable</th>
+                    <th>Estado</th>
+                    <th>Fecha creación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="fertilizacionesTableBody">
+                {% for aplicacion in aplicaciones %}
+                <tr data-id="{{ aplicacion.id }}" data-search="{{ aplicacion.cuartel.predio.nombre_predio|lower }} {{ aplicacion.cuartel.nombre_cuartel|lower }} {{ aplicacion.producto|default:''|lower }} {{ aplicacion.tipo_producto|default:''|lower }} {{ aplicacion.metodo_aplicacion|default:''|lower }} {{ aplicacion.responsable|default:''|lower }} {% if aplicacion.estado %}activo{% else %}inactivo{% endif %}">
+                    <td>{{ aplicacion.id }}</td>
+                    <td>{{ aplicacion.cuartel.predio.nombre_predio }}</td>
+                    <td><div class="user-name">{{ aplicacion.cuartel.nombre_cuartel }}</div></td>
+                    <td>{{ aplicacion.fecha_aplicacion|date:'d/m/Y'|default:'-' }}</td>
+                    <td>{{ aplicacion.producto|default:'-' }}</td>
+                    <td>{{ aplicacion.tipo_producto|default:'-' }}</td>
+                    <td>{{ aplicacion.dosis|default:'-' }}</td>
+                    <td>{{ aplicacion.unidad|default:'-' }}</td>
+                    <td>{{ aplicacion.metodo_aplicacion|default:'-' }}</td>
+                    <td>{{ aplicacion.responsable|default:'-' }}</td>
+                    <td>
+                        {% if aplicacion.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ aplicacion.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion({{ aplicacion.id }})">
+                            <i class="bi bi-pencil-fill"></i> Editar
+                        </button>
+                        <button class="btn btn-sm btn-secondary" type="button" onclick="toggleFertilizacionEstado({{ aplicacion.id }}, {{ aplicacion.estado|yesno:'true,false' }}, '{{ aplicacion.cuartel.nombre_cuartel|escapejs }}')">
+                            <i class="bi bi-slash-circle-fill"></i> {% if aplicacion.estado %}Desactivar{% else %}Activar{% endif %}
+                        </button>
+                        <button class="btn btn-sm btn-danger" type="button" onclick="deleteFertilizacion({{ aplicacion.id }}, '{{ aplicacion.cuartel.nombre_cuartel|escapejs }}')">
+                            <i class="bi bi-trash-fill"></i> Eliminar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr id="fertilizacionesEmptyRow">
+                    <td colspan="13" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay aplicaciones químicas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cards-mobile" id="fertilizacionesCards">
+        {% for aplicacion in aplicaciones %}
+        <div class="user-card" data-id="{{ aplicacion.id }}" data-search="{{ aplicacion.cuartel.predio.nombre_predio|lower }} {{ aplicacion.cuartel.nombre_cuartel|lower }} {{ aplicacion.producto|default:''|lower }} {{ aplicacion.tipo_producto|default:''|lower }} {{ aplicacion.metodo_aplicacion|default:''|lower }} {{ aplicacion.responsable|default:''|lower }} {% if aplicacion.estado %}activo{% else %}inactivo{% endif %}">
+            <div class="user-card-head">
+                <div>
+                    <div class="user-name">{{ aplicacion.cuartel.nombre_cuartel }}</div>
+                    <div class="user-card-info">{{ aplicacion.cuartel.predio.nombre_predio }}</div>
+                </div>
+                <div>
+                    {% if aplicacion.estado %}
+                        <span class="badge badge-success">Activo</span>
+                    {% else %}
+                        <span class="badge badge-warning">Inactivo</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="user-card-info"><strong>ID:</strong> {{ aplicacion.id }}</div>
+            <div class="user-card-info"><strong>Fecha aplicación:</strong> {{ aplicacion.fecha_aplicacion|date:'d/m/Y'|default:'-' }}</div>
+            <div class="user-card-info"><strong>Producto:</strong> {{ aplicacion.producto|default:'-' }}</div>
+            <div class="user-card-info"><strong>Tipo:</strong> {{ aplicacion.tipo_producto|default:'-' }}</div>
+            <div class="user-card-info"><strong>Dosis:</strong> {{ aplicacion.dosis|default:'-' }}</div>
+            <div class="user-card-info"><strong>Unidad:</strong> {{ aplicacion.unidad|default:'-' }}</div>
+            <div class="user-card-info"><strong>Método:</strong> {{ aplicacion.metodo_aplicacion|default:'-' }}</div>
+            <div class="user-card-info"><strong>Responsable:</strong> {{ aplicacion.responsable|default:'-' }}</div>
+            <div class="user-card-info"><strong>Creación:</strong> {{ aplicacion.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
+            <div class="actions-cell" style="margin-top: 0.9rem;">
+                <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion({{ aplicacion.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                <button class="btn btn-sm btn-secondary" type="button" onclick="toggleFertilizacionEstado({{ aplicacion.id }}, {{ aplicacion.estado|yesno:'true,false' }}, '{{ aplicacion.cuartel.nombre_cuartel|escapejs }}')">
+                    <i class="bi bi-slash-circle-fill"></i> {% if aplicacion.estado %}Desactivar{% else %}Activar{% endif %}
+                </button>
+                <button class="btn btn-sm btn-danger" type="button" onclick="deleteFertilizacion({{ aplicacion.id }}, '{{ aplicacion.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="fertilizacionModal">
+    <div class="modal" style="max-width: 820px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="bi bi-bezier2"></i> <span id="modalTitle">Agregar Aplicación Química</span></h2>
+            <button class="modal-close" type="button" onclick="closeFertilizacionModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="fertilizacionForm" method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="fertilizacion_id" id="fertilizacionId">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="predio">Predio *</label>
+                        <select class="form-control" id="predio" name="predio" required onchange="onPredioChange()">
+                            <option value="">Selecciona un predio</option>
+                            {% for predio in predios_activos %}
+                                <option value="{{ predio.id }}">{{ predio.nombre_predio }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="field-error" id="error-predio"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="cuartel">Cuartel *</label>
+                        <select class="form-control" id="cuartel" name="cuartel" required disabled>
+                            <option value="">Selecciona primero un predio</option>
+                        </select>
+                        <small class="field-error" id="error-cuartel"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fecha_aplicacion">Fecha Aplicación *</label>
+                        <input class="form-control" type="date" id="fecha_aplicacion" name="fecha_aplicacion" required>
+                        <small class="field-error" id="error-fecha_aplicacion"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="producto">Producto *</label>
+                        <input class="form-control" type="text" id="producto" name="producto" placeholder="NPK 20-20-20">
+                        <small class="field-error" id="error-producto"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="tipo_producto">Tipo Producto</label>
+                        <input class="form-control" type="text" id="tipo_producto" name="tipo_producto" placeholder="Herbicida, Fungicida, Insecticida...">
+                        <small class="field-error" id="error-tipo_producto"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="dosis">Dosis</label>
+                        <input class="form-control" type="number" id="dosis" name="dosis" min="0" step="0.01" placeholder="120.00">
+                        <small class="field-error" id="error-dosis"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="unidad">Unidad</label>
+                        <input class="form-control" type="text" id="unidad" name="unidad" placeholder="kg/ha, L/ha">
+                        <small class="field-error" id="error-unidad"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="metodo_aplicacion">Método Aplicación</label>
+                        <input class="form-control" type="text" id="metodo_aplicacion" name="metodo_aplicacion" placeholder="Mochila, pulverización, dron, al suelo">
+                        <small class="field-error" id="error-metodo_aplicacion"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="responsable">Responsable</label>
+                        <input class="form-control" type="text" id="responsable" name="responsable" placeholder="Nombre del aplicador o técnico responsable">
+                        <small class="field-error" id="error-responsable"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="observaciones">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3" placeholder="Observaciones técnicas de la aplicación química"></textarea>
+                        <small class="field-error" id="error-observaciones"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" style="display:flex; gap:0.6rem; align-items:center;">
+                            <input type="checkbox" id="estado" name="estado" checked>
+                            Aplicación activa
+                        </label>
+                    </div>
+                </div>
+
+                <div id="formError" class="alert alert-danger" style="display:none; margin-top: 0.5rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span id="formErrorText"></span>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeFertilizacionModal()"><i class="bi bi-x-circle"></i> Cancelar</button>
+            <button class="btn btn-primary" type="button" id="saveFertilizacionBtn" onclick="saveFertilizacion()"><i class="bi bi-check-circle"></i> Guardar Aplicación</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if request.resolver_match.url_name == 'aplicaciones_quimicas_analitica' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endif %}
+<script>
+    const isAplicacionesGestionView = "{{ request.resolver_match.url_name }}" === 'aplicaciones_quimicas_lista';
+    const isAplicacionesAnaliticaView = "{{ request.resolver_match.url_name }}" === 'aplicaciones_quimicas_analitica';
+    const aqCharts = {};
+
+    function destroyAqChart(id) {
+        if (aqCharts[id]) {
+            aqCharts[id].destroy();
+            aqCharts[id] = null;
+        }
+    }
+
+    function renderAplicacionesCharts(analytics = {}) {
+        const productos = analytics.productos_top || { labels: [], series: [] };
+        const cuarteles = analytics.cuarteles_top || { labels: [], series: [] };
+        const mensual = analytics.mensual || { labels: [], series: [] };
+
+        destroyAqChart('aqProductosChart');
+        aqCharts.aqProductosChart = new Chart(document.getElementById('aqProductosChart'), {
+            type: 'bar',
+            data: {
+                labels: productos.labels,
+                datasets: [{
+                    label: 'Aplicaciones',
+                    data: productos.series,
+                    borderColor: '#2ecc71',
+                    backgroundColor: 'rgba(46, 204, 113, 0.35)',
+                }],
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        });
+
+        destroyAqChart('aqCuartelesChart');
+        aqCharts.aqCuartelesChart = new Chart(document.getElementById('aqCuartelesChart'), {
+            type: 'bar',
+            data: {
+                labels: cuarteles.labels,
+                datasets: [{
+                    label: 'Aplicaciones',
+                    data: cuarteles.series,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.35)',
+                }],
+            },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+        });
+
+        destroyAqChart('aqMensualChart');
+        aqCharts.aqMensualChart = new Chart(document.getElementById('aqMensualChart'), {
+            type: 'line',
+            data: {
+                labels: mensual.labels,
+                datasets: [{
+                    label: 'Aplicaciones',
+                    data: mensual.series,
+                    borderColor: '#8e44ad',
+                    backgroundColor: 'rgba(142, 68, 173, 0.25)',
+                    tension: 0.3,
+                    fill: true,
+                }],
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+        });
+    }
+
+    async function loadAplicacionesAnalytics() {
+        if (!isAplicacionesAnaliticaView) return;
+        const params = buildAnalyticsParams();
+        try {
+            const response = await fetch(`/api/aplicaciones-quimicas/analitica/?${params.toString()}`);
+            const payload = await response.json();
+            if (!payload.success) return;
+            renderAplicacionesCharts(payload.analytics || {});
+            renderAplicacionesRanking(payload.analytics || {});
+        } catch (error) {
+            console.warn('No se pudo cargar analitica de aplicaciones quimicas.');
+        }
+    }
+
+    function buildAnalyticsParams() {
+        const params = new URLSearchParams();
+        const predio = document.getElementById('filterPredio')?.value;
+        const cuartel = document.getElementById('filterCuartel')?.value;
+        const fechaDesde = document.getElementById('filterDesde')?.value;
+        const fechaHasta = document.getElementById('filterHasta')?.value;
+
+        if (predio) params.append('predio', predio);
+        if (cuartel) params.append('cuartel', cuartel);
+        if (fechaDesde) params.append('fecha_desde', fechaDesde);
+        if (fechaHasta) params.append('fecha_hasta', fechaHasta);
+        return params;
+    }
+
+    function syncCuartelesByPredio() {
+        const predio = document.getElementById('filterPredio')?.value;
+        const cuartelSelect = document.getElementById('filterCuartel');
+        if (!cuartelSelect) return;
+
+        Array.from(cuartelSelect.options).forEach((opt, idx) => {
+            if (idx === 0) return;
+            const matches = !predio || String(opt.dataset.predio) === String(predio);
+            opt.hidden = !matches;
+            if (!matches && opt.selected) cuartelSelect.value = '';
+        });
+    }
+
+    function clearAnalyticsFilters() {
+        const predio = document.getElementById('filterPredio');
+        const cuartel = document.getElementById('filterCuartel');
+        const desde = document.getElementById('filterDesde');
+        const hasta = document.getElementById('filterHasta');
+        if (predio) predio.value = '';
+        if (cuartel) cuartel.value = '';
+        if (desde) desde.value = '';
+        if (hasta) hasta.value = '';
+        syncCuartelesByPredio();
+    }
+
+    function renderAplicacionesRanking(analytics = {}) {
+        const tbody = document.getElementById('aqRankingBody');
+        if (!tbody) return;
+
+        const labels = analytics.productos_top?.labels || [];
+        const series = analytics.productos_top?.series || [];
+        if (!labels.length) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center">Sin datos para el filtro seleccionado.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = labels.map((label, idx) => `
+            <tr>
+                <td>${label}</td>
+                <td>${series[idx] || 0}</td>
+            </tr>
+        `).join('');
+    }
+
+    function csrfToken() {
+        return document.querySelector('#fertilizacionForm input[name="csrfmiddlewaretoken"]').value;
+    }
+
+    function fertilizacionSearchText(fertilizacion) {
+        return [
+            fertilizacion.predio_nombre || '',
+            fertilizacion.cuartel_nombre || '',
+            fertilizacion.producto || '',
+            fertilizacion.tipo_producto || '',
+            fertilizacion.unidad || '',
+            fertilizacion.metodo_aplicacion || '',
+            fertilizacion.responsable || '',
+            fertilizacion.observaciones || '',
+            fertilizacion.estado ? 'activo' : 'inactivo'
+        ].join(' ').toLowerCase();
+    }
+
+    function estadoBadge(estado) {
+        return estado
+            ? '<span class="badge badge-success">Activo</span>'
+            : '<span class="badge badge-warning">Inactivo</span>';
+    }
+
+    function toggleLabel(estado) {
+        return estado ? 'Desactivar' : 'Activar';
+    }
+
+    function resetFieldErrors() {
+        document.querySelectorAll('#fertilizacionForm .form-control').forEach((field) => {
+            field.classList.remove('is-invalid');
+        });
+        document.querySelectorAll('#fertilizacionForm .field-error').forEach((el) => {
+            el.style.display = 'none';
+            el.textContent = '';
+        });
+        document.getElementById('formError').style.display = 'none';
+    }
+
+    function showFieldError(fieldName, message) {
+        const input = document.getElementById(fieldName);
+        const error = document.getElementById('error-' + fieldName);
+        if (input) input.classList.add('is-invalid');
+        if (error) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+    }
+
+    function showFormError(message) {
+        document.getElementById('formErrorText').textContent = message;
+        document.getElementById('formError').style.display = 'flex';
+    }
+
+    function updateResumenCards(resumen) {
+        if (!resumen) return;
+        const totalAplicaciones = document.getElementById('cardTotalAplicaciones');
+        const productosUtilizados = document.getElementById('cardProductosUtilizados');
+        const cuartelesTratados = document.getElementById('cardCuartelesTratados');
+        const ultimaAplicacion = document.getElementById('cardUltimaAplicacion');
+
+        if (totalAplicaciones) totalAplicaciones.textContent = resumen.total_aplicaciones;
+        if (productosUtilizados) productosUtilizados.textContent = resumen.productos_utilizados;
+        if (cuartelesTratados) cuartelesTratados.textContent = resumen.cuarteles_tratados;
+        if (ultimaAplicacion) ultimaAplicacion.textContent = resumen.ultima_aplicacion;
+    }
+
+    function clearCuartelSelect() {
+        const cuartelSelect = document.getElementById('cuartel');
+        cuartelSelect.innerHTML = '<option value="">Selecciona primero un predio</option>';
+        cuartelSelect.disabled = true;
+    }
+
+    async function loadCuartelesByPredio(predioId, selectedCuartelId = '') {
+        const cuartelSelect = document.getElementById('cuartel');
+
+        if (!predioId) {
+            clearCuartelSelect();
+            return;
+        }
+
+        cuartelSelect.disabled = true;
+        cuartelSelect.innerHTML = '<option value="">Cargando cuarteles...</option>';
+
+        try {
+            const response = await fetch(`/predios/${predioId}/cuarteles/`);
+            const data = await response.json();
+
+            if (!data.success) {
+                clearCuartelSelect();
+                showToast(data.error || 'No fue posible cargar los cuarteles.', 'error');
+                return;
+            }
+
+            const options = ['<option value="">Selecciona un cuartel</option>'];
+            data.cuarteles.forEach((cuartel) => {
+                const selected = String(selectedCuartelId) === String(cuartel.id) ? 'selected' : '';
+                options.push(`<option value="${cuartel.id}" ${selected}>${cuartel.nombre_cuartel}</option>`);
+            });
+
+            cuartelSelect.innerHTML = options.join('');
+            cuartelSelect.disabled = false;
+        } catch (error) {
+            clearCuartelSelect();
+            showToast('Ocurrió un error al cargar los cuarteles.', 'error');
+        }
+    }
+
+    function onPredioChange() {
+        const predioId = document.getElementById('predio').value;
+        loadCuartelesByPredio(predioId);
+    }
+
+    function openAddFertilizacionModal() {
+        resetFieldErrors();
+        document.getElementById('modalTitle').textContent = 'Agregar Aplicación Química';
+        document.getElementById('fertilizacionForm').reset();
+        document.getElementById('fertilizacionId').value = '';
+        document.getElementById('estado').checked = true;
+        clearCuartelSelect();
+        openModal('fertilizacionModal');
+    }
+
+    function closeFertilizacionModal() {
+        closeModal('fertilizacionModal');
+    }
+
+    async function editFertilizacion(id) {
+        resetFieldErrors();
+        const response = await fetch(`/aplicaciones-quimicas/${id}/`);
+        const data = await response.json();
+
+        if (!data.success) {
+            showToast(data.error || 'No fue posible cargar la aplicación química.', 'error');
+            return;
+        }
+
+        const f = data.aplicacion;
+        document.getElementById('modalTitle').textContent = 'Editar Aplicación Química';
+        document.getElementById('fertilizacionId').value = f.id;
+        document.getElementById('predio').value = f.predio_id || '';
+        await loadCuartelesByPredio(f.predio_id, f.cuartel_id);
+        document.getElementById('fecha_aplicacion').value = f.fecha_aplicacion_iso || '';
+        document.getElementById('producto').value = f.producto || '';
+        document.getElementById('tipo_producto').value = f.tipo_producto || '';
+        document.getElementById('dosis').value = f.dosis || '';
+        document.getElementById('unidad').value = f.unidad || '';
+        document.getElementById('metodo_aplicacion').value = f.metodo_aplicacion || '';
+        document.getElementById('responsable').value = f.responsable || '';
+        document.getElementById('observaciones').value = f.observaciones || '';
+        document.getElementById('estado').checked = !!f.estado;
+
+        openModal('fertilizacionModal');
+    }
+
+    function renderFertilizacionRow(f) {
+        return `
+            <tr data-id="${f.id}" data-search="${fertilizacionSearchText(f)}">
+                <td>${f.id}</td>
+                <td>${f.predio_nombre}</td>
+                <td><div class="user-name">${f.cuartel_nombre}</div></td>
+                <td>${f.fecha_aplicacion || '-'}</td>
+                <td>${f.producto || '-'}</td>
+                <td>${f.tipo_producto || '-'}</td>
+                <td>${f.dosis || '-'}</td>
+                <td>${f.unidad || '-'}</td>
+                <td>${f.metodo_aplicacion || '-'}</td>
+                <td>${f.responsable || '-'}</td>
+                <td>${estadoBadge(f.estado)}</td>
+                <td>${f.created_at || '-'}</td>
+                <td class="actions-cell">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion(${f.id})">
+                        <i class="bi bi-pencil-fill"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleFertilizacionEstado(${f.id}, ${f.estado}, '${f.cuartel_nombre.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(f.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteFertilizacion(${f.id}, '${f.cuartel_nombre.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-trash-fill"></i> Eliminar
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+
+    function renderFertilizacionCard(f) {
+        return `
+            <div class="user-card" data-id="${f.id}" data-search="${fertilizacionSearchText(f)}">
+                <div class="user-card-head">
+                    <div>
+                        <div class="user-name">${f.cuartel_nombre}</div>
+                        <div class="user-card-info">${f.predio_nombre}</div>
+                    </div>
+                    <div>${estadoBadge(f.estado)}</div>
+                </div>
+                <div class="user-card-info"><strong>ID:</strong> ${f.id}</div>
+                <div class="user-card-info"><strong>Fecha aplicación:</strong> ${f.fecha_aplicacion || '-'}</div>
+                <div class="user-card-info"><strong>Producto:</strong> ${f.producto || '-'}</div>
+                <div class="user-card-info"><strong>Tipo:</strong> ${f.tipo_producto || '-'}</div>
+                <div class="user-card-info"><strong>Dosis:</strong> ${f.dosis || '-'}</div>
+                <div class="user-card-info"><strong>Unidad:</strong> ${f.unidad || '-'}</div>
+                <div class="user-card-info"><strong>Método:</strong> ${f.metodo_aplicacion || '-'}</div>
+                <div class="user-card-info"><strong>Responsable:</strong> ${f.responsable || '-'}</div>
+                <div class="user-card-info"><strong>Creación:</strong> ${f.created_at || '-'}</div>
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion(${f.id})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleFertilizacionEstado(${f.id}, ${f.estado}, '${f.cuartel_nombre.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(f.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteFertilizacion(${f.id}, '${f.cuartel_nombre.replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function removeEmptyState() {
+        const emptyRow = document.getElementById('fertilizacionesEmptyRow');
+        if (emptyRow) emptyRow.remove();
+    }
+
+    function upsertFertilizacionInDom(fertilizacion) {
+        removeEmptyState();
+
+        const tbody = document.getElementById('fertilizacionesTableBody');
+        const cards = document.getElementById('fertilizacionesCards');
+        const rowMarkup = renderFertilizacionRow(fertilizacion);
+        const cardMarkup = renderFertilizacionCard(fertilizacion);
+        const existingRow = tbody.querySelector(`tr[data-id="${fertilizacion.id}"]`);
+        const existingCard = cards.querySelector(`.user-card[data-id="${fertilizacion.id}"]`);
+
+        if (existingRow) {
+            existingRow.outerHTML = rowMarkup;
+        } else {
+            tbody.insertAdjacentHTML('afterbegin', rowMarkup);
+        }
+
+        if (existingCard) {
+            existingCard.outerHTML = cardMarkup;
+        } else {
+            cards.insertAdjacentHTML('afterbegin', cardMarkup);
+        }
+
+        filterFertilizaciones();
+    }
+
+    function removeFertilizacionFromDom(id) {
+        const row = document.querySelector(`#fertilizacionesTableBody tr[data-id="${id}"]`);
+        const card = document.querySelector(`#fertilizacionesCards .user-card[data-id="${id}"]`);
+        if (row) row.remove();
+        if (card) card.remove();
+
+        const rows = document.querySelectorAll('#fertilizacionesTableBody tr[data-id]');
+        if (!rows.length) {
+            document.getElementById('fertilizacionesTableBody').innerHTML =
+                '<tr id="fertilizacionesEmptyRow"><td colspan="13" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay aplicaciones químicas registradas.</td></tr>';
+        }
+    }
+
+    async function saveFertilizacion() {
+        resetFieldErrors();
+
+        const form = document.getElementById('fertilizacionForm');
+        const btn = document.getElementById('saveFertilizacionBtn');
+        const fertilizacionId = document.getElementById('fertilizacionId').value;
+        const url = fertilizacionId ? `/aplicaciones-quimicas/${fertilizacionId}/editar/` : '/aplicaciones-quimicas/crear/';
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken() },
+                body: formData,
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                upsertFertilizacionInDom(data.aplicacion);
+                updateResumenCards(data.resumen);
+                closeFertilizacionModal();
+                showToast(data.message || 'Aplicación química guardada correctamente.', 'success');
+                return;
+            }
+
+            if (data.errors) {
+                Object.entries(data.errors).forEach(([field, message]) => {
+                    if (field !== '__all__') showFieldError(field, message);
+                });
+                if (data.errors.__all__) showFormError(data.errors.__all__);
+            }
+
+            if (!data.errors) {
+                showFormError(data.error || 'No fue posible guardar la aplicación química.');
+            }
+        } catch (error) {
+            showFormError('Ocurrió un error inesperado al guardar.');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function deleteFertilizacion(id, nombreCuartel) {
+        showConfirmModal(
+            'Eliminar aplicación química',
+            `Se eliminará la aplicación del cuartel <strong>${nombreCuartel}</strong>. Esta acción no se puede deshacer.`,
+            async () => {
+                const response = await fetch(`/aplicaciones-quimicas/${id}/eliminar/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken() },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    removeFertilizacionFromDom(id);
+                    updateResumenCards(data.resumen);
+                    showToast(data.message || 'Aplicación química eliminada.', 'success');
+                } else {
+                    showToast(data.error || 'No se pudo eliminar la aplicación química.', 'error');
+                }
+            },
+            'Eliminar',
+            'Cancelar'
+        );
+    }
+
+    function toggleFertilizacionEstado(id, estadoActual, nombreCuartel) {
+        const accion = estadoActual ? 'desactivar' : 'activar';
+        showConfirmModal(
+            `${accion.charAt(0).toUpperCase() + accion.slice(1)} aplicación química`,
+            `¿Deseas ${accion} la aplicación del cuartel <strong>${nombreCuartel}</strong>?`,
+            async () => {
+                const response = await fetch(`/aplicaciones-quimicas/${id}/toggle-estado/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken() },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const detailResponse = await fetch(`/aplicaciones-quimicas/${id}/`);
+                    const detailData = await detailResponse.json();
+                    if (detailData.success) {
+                        upsertFertilizacionInDom(detailData.aplicacion);
+                    }
+                    updateResumenCards(data.resumen);
+                    showToast(data.message || 'Estado actualizado.', 'success');
+                } else {
+                    showToast(data.error || 'No se pudo actualizar el estado.', 'error');
+                }
+            },
+            estadoActual ? 'Desactivar' : 'Activar',
+            'Cancelar'
+        );
+    }
+
+    function filterFertilizaciones() {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        document.querySelectorAll('#fertilizacionesTableBody tr[data-search]').forEach((row) => {
+            row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+        });
+        document.querySelectorAll('#fertilizacionesCards .user-card[data-search]').forEach((card) => {
+            card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+        });
+    }
+
+    if (isAplicacionesGestionView) {
+        document.getElementById('fertilizacionModal').addEventListener('click', function (event) {
+            if (event.target === this) closeFertilizacionModal();
+        });
+    }
+
+    if (isAplicacionesAnaliticaView) {
+        document.getElementById('btnApplyFilters')?.addEventListener('click', loadAplicacionesAnalytics);
+        document.getElementById('btnClearFilters')?.addEventListener('click', () => {
+            clearAnalyticsFilters();
+            loadAplicacionesAnalytics();
+        });
+        document.getElementById('filterPredio')?.addEventListener('change', syncCuartelesByPredio);
+        syncCuartelesByPredio();
+        loadAplicacionesAnalytics();
+    }
+</script>
+{% endblock %}

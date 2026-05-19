@@ -1,0 +1,724 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestion de Riego - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tools-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .table-filters {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
+        gap: 0.75rem;
+        align-items: end;
+        margin-bottom: 1rem;
+    }
+
+    .table-users th,
+    .table-users td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .cards-mobile {
+        display: none;
+        gap: 1rem;
+    }
+
+    .user-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .user-card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .user-card-info {
+        font-size: 0.9rem;
+        color: #566573;
+        margin-bottom: 0.3rem;
+    }
+
+    .pagination-wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .pagination-links {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .form-grid .full {
+        grid-column: 1 / -1;
+    }
+
+    .field-error {
+        color: #b42318;
+        font-size: 0.85rem;
+        margin-top: 0.35rem;
+        display: none;
+    }
+
+    .form-control.is-invalid,
+    .form-select.is-invalid,
+    .form-check-input.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+
+    @media (max-width: 1200px) {
+        .table-filters {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 992px) {
+        .table-users-wrap {
+            display: none;
+        }
+
+        .cards-mobile {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        .table-filters {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 768px) {
+        .table-filters {
+            grid-template-columns: 1fr;
+        }
+
+        .tools-row {
+            align-items: stretch;
+        }
+
+        .tools-row .btn,
+        .tools-row a {
+            width: 100%;
+            text-align: center;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-droplet-fill"></i> Gestion de Riego</h1>
+</div>
+
+<div class="card">
+    <form method="get" class="table-filters">
+        <div class="form-group">
+            <label class="form-label" for="q">Busqueda</label>
+            <input class="form-control" id="q" name="q" type="text" value="{{ q }}" placeholder="Predio, cuartel, tipo, observaciones o responsable">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="predio">Predio</label>
+            <select class="form-control" id="predio" name="predio" onchange="this.form.submit()">
+                <option value="">Todos</option>
+                {% for predio in predios_activos %}
+                    <option value="{{ predio.id }}" {% if predio_id == predio.id|stringformat:'s' %}selected{% endif %}>{{ predio.nombre_predio }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="cuartelFiltro">Cuartel</label>
+            <select class="form-control" id="cuartelFiltro" name="cuartel">
+                <option value="">Todos</option>
+                {% for cuartel in cuarteles_activos %}
+                    <option value="{{ cuartel.id }}" {% if cuartel_id == cuartel.id|stringformat:'s' %}selected{% endif %}>{{ cuartel.nombre_cuartel }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="estado">Estado</label>
+            <select class="form-control" id="estado" name="estado">
+                <option value="">Todos</option>
+                <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activo</option>
+                <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivo</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="fecha_desde">Fecha desde</label>
+            <input class="form-control" id="fecha_desde" name="fecha_desde" type="date" value="{{ fecha_desde }}">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="fecha_hasta">Fecha hasta</label>
+            <input class="form-control" id="fecha_hasta" name="fecha_hasta" type="date" value="{{ fecha_hasta }}">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="ordering">Orden</label>
+            <select class="form-control" id="ordering" name="ordering">
+                <option value="fecha_desc" {% if ordering == 'fecha_desc' %}selected{% endif %}>Fecha (reciente)</option>
+                <option value="fecha_asc" {% if ordering == 'fecha_asc' %}selected{% endif %}>Fecha (antigua)</option>
+                <option value="litros_desc" {% if ordering == 'litros_desc' %}selected{% endif %}>Litros (mayor)</option>
+                <option value="litros_asc" {% if ordering == 'litros_asc' %}selected{% endif %}>Litros (menor)</option>
+                <option value="cuartel_asc" {% if ordering == 'cuartel_asc' %}selected{% endif %}>Cuartel (A-Z)</option>
+                <option value="predio_asc" {% if ordering == 'predio_asc' %}selected{% endif %}>Predio (A-Z)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel-fill"></i> Aplicar</button>
+        </div>
+
+        <div class="form-group">
+            <a class="btn btn-secondary" href="{% url 'riegos_gestion' %}"><i class="bi bi-arrow-counterclockwise"></i> Limpiar</a>
+        </div>
+    </form>
+
+    <div class="tools-row">
+        <div><strong>Total registros:</strong> {{ page_obj.paginator.count }}</div>
+        <div class="actions-cell">
+            <a class="btn btn-secondary" href="{% url 'riegos_analitica' %}"><i class="bi bi-graph-up-arrow"></i> Ver analitica</a>
+            {% if current_user %}
+            {% if current_user.rol == 'admin' or current_user.rol == 'productor' %}
+                <a
+                    class="btn btn-pdf js-export-download"
+                    href="{% url 'riegos_export_pdf' %}?q={{ q|urlencode }}&predio={{ predio_id|urlencode }}&cuartel={{ cuartel_id|urlencode }}&estado={{ estado|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}&ordering={{ ordering|urlencode }}"
+                    data-loading-text="Generando PDF..."
+                >
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
+                </a>
+                <a
+                    class="btn btn-excel js-export-download"
+                    href="{% url 'riegos_export_excel' %}?q={{ q|urlencode }}&predio={{ predio_id|urlencode }}&cuartel={{ cuartel_id|urlencode }}&estado={{ estado|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}&ordering={{ ordering|urlencode }}"
+                    data-loading-text="Generando Excel..."
+                >
+                    <i class="bi bi-file-earmark-spreadsheet-fill"></i> Exportar Excel
+                </a>
+            {% endif %}
+            {% endif %}
+            {% if can_manage %}
+                <button type="button" class="btn btn-primary" onclick="openAddRiegoModal()"><i class="bi bi-plus-circle-fill"></i> Agregar riego</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Predio</th>
+                    <th>Cuartel</th>
+                    <th>Tipo</th>
+                    <th>Horas</th>
+                    <th>Caudal</th>
+                    <th>Litros</th>
+                    <th>Estado</th>
+                    {% if can_manage %}<th>Acciones</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for riego in riegos %}
+                    <tr>
+                        <td>{{ riego.fecha_riego|date:'d/m/Y'|default:'-' }}</td>
+                        <td>{{ riego.cuartel.predio.nombre_predio }}</td>
+                        <td><span class="user-name">{{ riego.cuartel.nombre_cuartel }}</span></td>
+                        <td>{{ riego.tipo_riego|default:'-' }}</td>
+                        <td>{{ riego.horas_riego|default:'-' }}</td>
+                        <td>{{ riego.caudal|default:'-' }}</td>
+                        <td>{{ riego.litros_estimados|default:0|floatformat:2 }}</td>
+                        <td>
+                            {% if riego.estado %}
+                                <span class="badge badge-success">Activo</span>
+                            {% else %}
+                                <span class="badge badge-warning">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        {% if can_manage %}
+                            <td class="actions-cell">
+                                <button class="btn btn-sm btn-primary" type="button" onclick="editRiego({{ riego.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                                <button class="btn btn-sm btn-secondary" type="button" onclick="toggleRiegoEstado({{ riego.id }}, {{ riego.estado|yesno:'true,false' }}, '{{ riego.cuartel.nombre_cuartel|escapejs }}')">
+                                    <i class="bi bi-slash-circle-fill"></i> {% if riego.estado %}Desactivar{% else %}Activar{% endif %}
+                                </button>
+                                <button class="btn btn-sm btn-danger" type="button" onclick="deleteRiego({{ riego.id }}, '{{ riego.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="{% if can_manage %}9{% else %}8{% endif %}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay riegos para los filtros seleccionados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cards-mobile">
+        {% for riego in riegos %}
+            <div class="user-card">
+                <div class="user-card-head">
+                    <div>
+                        <div class="user-name">{{ riego.cuartel.nombre_cuartel }}</div>
+                        <div class="user-card-info">{{ riego.cuartel.predio.nombre_predio }}</div>
+                    </div>
+                    <div>
+                        {% if riego.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="user-card-info"><strong>Fecha:</strong> {{ riego.fecha_riego|date:'d/m/Y'|default:'-' }}</div>
+                <div class="user-card-info"><strong>Tipo:</strong> {{ riego.tipo_riego|default:'-' }}</div>
+                <div class="user-card-info"><strong>Horas:</strong> {{ riego.horas_riego|default:'-' }}</div>
+                <div class="user-card-info"><strong>Caudal:</strong> {{ riego.caudal|default:'-' }}</div>
+                <div class="user-card-info"><strong>Litros:</strong> {{ riego.litros_estimados|default:0|floatformat:2 }}</div>
+                {% if can_manage %}
+                    <div class="actions-cell" style="margin-top: 0.9rem;">
+                        <button class="btn btn-sm btn-primary" type="button" onclick="editRiego({{ riego.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                        <button class="btn btn-sm btn-secondary" type="button" onclick="toggleRiegoEstado({{ riego.id }}, {{ riego.estado|yesno:'true,false' }}, '{{ riego.cuartel.nombre_cuartel|escapejs }}')">
+                            <i class="bi bi-slash-circle-fill"></i> {% if riego.estado %}Desactivar{% else %}Activar{% endif %}
+                        </button>
+                        <button class="btn btn-sm btn-danger" type="button" onclick="deleteRiego({{ riego.id }}, '{{ riego.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                    </div>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div class="user-card"><div class="user-card-info">No hay riegos para los filtros seleccionados.</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="pagination-wrap">
+        <div>Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</div>
+        <div class="pagination-links">
+            {% if page_obj.has_previous %}
+                <a class="btn btn-sm btn-secondary" href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&predio={{ predio_id|urlencode }}&cuartel={{ cuartel_id|urlencode }}&estado={{ estado|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}&ordering={{ ordering|urlencode }}">Anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a class="btn btn-sm btn-secondary" href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&predio={{ predio_id|urlencode }}&cuartel={{ cuartel_id|urlencode }}&estado={{ estado|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}&ordering={{ ordering|urlencode }}">Siguiente</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if can_manage %}
+<div class="modal-overlay" id="riegoModal">
+    <div class="modal" style="max-width: 820px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="bi bi-droplet"></i> <span id="modalTitle">Agregar Riego</span></h2>
+            <button class="modal-close" type="button" onclick="closeRiegoModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="riegoForm" method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="riego_id" id="riegoId">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="predioModal">Predio *</label>
+                        <select class="form-control" id="predioModal" name="predio" required onchange="onPredioChange()">
+                            <option value="">Selecciona un predio</option>
+                            {% for predio in predios_activos %}
+                                <option value="{{ predio.id }}">{{ predio.nombre_predio }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="field-error" id="error-predio"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="cuartel">Cuartel *</label>
+                        <select class="form-control" id="cuartel" name="cuartel" required disabled>
+                            <option value="">Selecciona primero un predio</option>
+                        </select>
+                        <small class="field-error" id="error-cuartel"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fecha_riego">Fecha Riego *</label>
+                        <input class="form-control" type="date" id="fecha_riego" name="fecha_riego" required>
+                        <small class="field-error" id="error-fecha_riego"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="tipo_riego">Tipo Riego</label>
+                        <input class="form-control" type="text" id="tipo_riego" name="tipo_riego" placeholder="Goteo, Aspersion, Tendido...">
+                        <small class="field-error" id="error-tipo_riego"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="horas_riego">Horas Riego</label>
+                        <input class="form-control" type="number" id="horas_riego" name="horas_riego" min="0" step="0.01" placeholder="2.50">
+                        <small class="field-error" id="error-horas_riego"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="caudal">Caudal</label>
+                        <input class="form-control" type="number" id="caudal" name="caudal" min="0" step="0.01" placeholder="18.00">
+                        <small class="field-error" id="error-caudal"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="observaciones">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3" placeholder="Observaciones tecnicas del riego"></textarea>
+                        <small class="field-error" id="error-observaciones"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" style="display:flex; gap:0.6rem; align-items:center;">
+                            <input type="checkbox" id="estadoModal" name="estado" checked>
+                            Riego activo
+                        </label>
+                    </div>
+                </div>
+
+                <div id="formError" class="alert alert-danger" style="display:none; margin-top: 0.5rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span id="formErrorText"></span>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeRiegoModal()"><i class="bi bi-x-circle"></i> Cancelar</button>
+            <button class="btn btn-primary" type="button" id="saveRiegoBtn" onclick="saveRiego()"><i class="bi bi-check-circle"></i> Guardar Riego</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const CAN_MANAGE_RIEGO = {{ can_manage|yesno:'true,false' }};
+
+    async function triggerFileDownload(link) {
+        const originalHtml = link.innerHTML;
+        const loadingText = link.dataset.loadingText || 'Procesando...';
+
+        link.classList.add('disabled');
+        link.style.pointerEvents = 'none';
+        link.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${loadingText}`;
+
+        try {
+            if (typeof showToast === 'function') {
+                showToast('Preparando descarga del reporte...', 'info');
+            }
+
+            const response = await fetch(link.href, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            const contentType = (response.headers.get('content-type') || '').toLowerCase();
+
+            if (!response.ok || contentType.includes('application/json')) {
+                let errorMessage = 'No fue posible generar el archivo.';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                } catch (e) {
+                    // Ignorar parse error y usar mensaje por defecto.
+                }
+                throw new Error(errorMessage);
+            }
+
+            const blob = await response.blob();
+            const disposition = response.headers.get('content-disposition') || '';
+            const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
+            const filename = nameMatch ? nameMatch[1] : 'reporte_riego';
+
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.URL.revokeObjectURL(url);
+
+            if (typeof showToast === 'function') {
+                showToast('Reporte generado correctamente.', 'success');
+            }
+        } catch (error) {
+            if (typeof showToast === 'function') {
+                showToast(error.message || 'Error al exportar reporte.', 'error');
+            }
+        } finally {
+            link.classList.remove('disabled');
+            link.style.pointerEvents = '';
+            link.innerHTML = originalHtml;
+        }
+    }
+
+    document.querySelectorAll('.js-export-download').forEach((link) => {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            triggerFileDownload(this);
+        });
+    });
+
+    if (CAN_MANAGE_RIEGO) {
+        function csrfToken() {
+            return document.querySelector('#riegoForm input[name="csrfmiddlewaretoken"]').value;
+        }
+
+        function resetFieldErrors() {
+            document.querySelectorAll('#riegoForm .form-control').forEach((field) => {
+                field.classList.remove('is-invalid');
+            });
+            document.querySelectorAll('#riegoForm .field-error').forEach((el) => {
+                el.style.display = 'none';
+                el.textContent = '';
+            });
+            document.getElementById('formError').style.display = 'none';
+        }
+
+        function showFieldError(fieldName, message) {
+            const input = document.getElementById(fieldName);
+            const error = document.getElementById('error-' + fieldName);
+            if (input) input.classList.add('is-invalid');
+            if (error) {
+                error.textContent = message;
+                error.style.display = 'block';
+            }
+        }
+
+        function showFormError(message) {
+            document.getElementById('formErrorText').textContent = message;
+            document.getElementById('formError').style.display = 'flex';
+        }
+
+        function clearCuartelSelect() {
+            const cuartelSelect = document.getElementById('cuartel');
+            cuartelSelect.innerHTML = '<option value="">Selecciona primero un predio</option>';
+            cuartelSelect.disabled = true;
+        }
+
+        async function loadCuartelesByPredio(predioId, selectedCuartelId = '') {
+            const cuartelSelect = document.getElementById('cuartel');
+
+            if (!predioId) {
+                clearCuartelSelect();
+                return;
+            }
+
+            cuartelSelect.disabled = true;
+            cuartelSelect.innerHTML = '<option value="">Cargando cuarteles...</option>';
+
+            try {
+                const response = await fetch(`/predios/${predioId}/cuarteles/`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    clearCuartelSelect();
+                    showToast(data.error || 'No fue posible cargar los cuarteles.', 'error');
+                    return;
+                }
+
+                const options = ['<option value="">Selecciona un cuartel</option>'];
+                data.cuarteles.forEach((cuartel) => {
+                    const selected = String(selectedCuartelId) === String(cuartel.id) ? 'selected' : '';
+                    options.push(`<option value="${cuartel.id}" ${selected}>${cuartel.nombre_cuartel}</option>`);
+                });
+
+                cuartelSelect.innerHTML = options.join('');
+                cuartelSelect.disabled = false;
+            } catch (error) {
+                clearCuartelSelect();
+                showToast('Ocurrio un error al cargar los cuarteles.', 'error');
+            }
+        }
+
+        window.onPredioChange = function onPredioChange() {
+            const predioId = document.getElementById('predioModal').value;
+            loadCuartelesByPredio(predioId);
+        };
+
+        window.openAddRiegoModal = function openAddRiegoModal() {
+            resetFieldErrors();
+            document.getElementById('modalTitle').textContent = 'Agregar Riego';
+            document.getElementById('riegoForm').reset();
+            document.getElementById('riegoId').value = '';
+            document.getElementById('estadoModal').checked = true;
+            clearCuartelSelect();
+            openModal('riegoModal');
+        };
+
+        window.closeRiegoModal = function closeRiegoModal() {
+            closeModal('riegoModal');
+        };
+
+        window.editRiego = async function editRiego(id) {
+            resetFieldErrors();
+            const response = await fetch(`/riegos/${id}/`);
+            const data = await response.json();
+
+            if (!data.success) {
+                showToast(data.error || 'No fue posible cargar el riego.', 'error');
+                return;
+            }
+
+            const r = data.riego;
+            document.getElementById('modalTitle').textContent = 'Editar Riego';
+            document.getElementById('riegoId').value = r.id;
+            document.getElementById('predioModal').value = r.predio_id || '';
+            await loadCuartelesByPredio(r.predio_id, r.cuartel_id);
+            document.getElementById('fecha_riego').value = r.fecha_riego_iso || '';
+            document.getElementById('tipo_riego').value = r.tipo_riego || '';
+            document.getElementById('horas_riego').value = r.horas_riego || '';
+            document.getElementById('caudal').value = r.caudal || '';
+            document.getElementById('observaciones').value = r.observaciones || '';
+            document.getElementById('estadoModal').checked = !!r.estado;
+
+            openModal('riegoModal');
+        };
+
+        window.saveRiego = async function saveRiego() {
+            resetFieldErrors();
+            const form = document.getElementById('riegoForm');
+            const btn = document.getElementById('saveRiegoBtn');
+            const riegoId = document.getElementById('riegoId').value;
+            const url = riegoId ? `/riegos/${riegoId}/editar/` : '/riegos/crear/';
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken() },
+                    body: formData,
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(data.message || 'Riego guardado correctamente.', 'success');
+                    setTimeout(() => window.location.reload(), 500);
+                    return;
+                }
+
+                if (data.errors) {
+                    Object.entries(data.errors).forEach(([field, message]) => {
+                        if (field !== '__all__') showFieldError(field, message);
+                    });
+                    if (data.errors.__all__) showFormError(data.errors.__all__);
+                }
+
+                if (!data.errors) {
+                    showFormError(data.error || 'No fue posible guardar el riego.');
+                }
+            } catch (error) {
+                showFormError('Ocurrio un error inesperado al guardar.');
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        window.deleteRiego = function deleteRiego(id, nombreCuartel) {
+            showConfirmModal(
+                'Eliminar riego',
+                `Se eliminara el riego del cuartel <strong>${nombreCuartel}</strong>. Esta accion no se puede deshacer.`,
+                async () => {
+                    const response = await fetch(`/riegos/${id}/eliminar/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken() },
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(data.message || 'Riego eliminado.', 'success');
+                        setTimeout(() => window.location.reload(), 500);
+                    } else {
+                        showToast(data.error || 'No se pudo eliminar el riego.', 'error');
+                    }
+                },
+                'Eliminar',
+                'Cancelar'
+            );
+        };
+
+        window.toggleRiegoEstado = function toggleRiegoEstado(id, estadoActual, nombreCuartel) {
+            const accion = estadoActual ? 'desactivar' : 'activar';
+            showConfirmModal(
+                `${accion.charAt(0).toUpperCase() + accion.slice(1)} riego`,
+                `Deseas ${accion} el riego del cuartel <strong>${nombreCuartel}</strong>?`,
+                async () => {
+                    const response = await fetch(`/riegos/${id}/toggle-estado/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken() },
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(data.message || 'Estado actualizado.', 'success');
+                        setTimeout(() => window.location.reload(), 500);
+                    } else {
+                        showToast(data.error || 'No se pudo actualizar el estado.', 'error');
+                    }
+                },
+                estadoActual ? 'Desactivar' : 'Activar',
+                'Cancelar'
+            );
+        };
+
+        const riegoModal = document.getElementById('riegoModal');
+        if (riegoModal) {
+            riegoModal.addEventListener('click', function (event) {
+                if (event.target === this) {
+                    closeRiegoModal();
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}

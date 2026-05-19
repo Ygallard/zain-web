@@ -1,0 +1,1041 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Cosechas - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+	.dashboard-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 1rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.stat-card {
+		background: #fff;
+		border-radius: 10px;
+		border: 1px solid #e8edf2;
+		box-shadow: var(--card-shadow);
+		padding: 1rem;
+		display: flex;
+		gap: 0.8rem;
+		align-items: center;
+	}
+
+	.stat-icon {
+		width: 44px;
+		height: 44px;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.2rem;
+	}
+
+	.stat-icon.primary {
+		background-color: rgba(52, 152, 219, 0.12);
+		color: #3498db;
+	}
+
+	.stat-icon.success {
+		background-color: rgba(46, 204, 113, 0.12);
+		color: #2ecc71;
+	}
+
+	.stat-icon.warning {
+		background-color: rgba(241, 196, 15, 0.12);
+		color: #f1c40f;
+	}
+
+	.stat-icon.info {
+		background-color: rgba(26, 188, 156, 0.12);
+		color: #16a085;
+	}
+
+	.stat-content h3 {
+		margin: 0;
+		line-height: 1;
+		color: var(--primary-color);
+		font-size: 1.5rem;
+	}
+
+	.stat-content p {
+		margin: 0.35rem 0 0;
+		color: #7f8c8d;
+		font-size: 0.9rem;
+	}
+
+	.users-toolbar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1.25rem;
+		flex-wrap: wrap;
+	}
+
+	.charts-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.chart-card {
+		background: #fff;
+		border: 1px solid #e8edf2;
+		border-radius: 10px;
+		box-shadow: var(--card-shadow);
+		padding: 1rem;
+	}
+
+	.chart-title {
+		margin: 0 0 0.8rem;
+		color: var(--primary-color);
+		font-size: 1rem;
+		font-weight: 700;
+	}
+
+	.chart-wrap {
+		position: relative;
+		width: 100%;
+		min-height: 260px;
+		max-height: 320px;
+	}
+
+	.search-box {
+		position: relative;
+		flex: 1;
+		min-width: 260px;
+		max-width: 520px;
+	}
+
+	.search-box i {
+		position: absolute;
+		left: 0.9rem;
+		top: 50%;
+		transform: translateY(-50%);
+		color: #7f8c8d;
+	}
+
+	.search-box input {
+		padding-left: 2.4rem;
+	}
+
+	.table-users th,
+	.table-users td {
+		white-space: nowrap;
+		vertical-align: middle;
+	}
+
+	.user-name {
+		font-weight: 700;
+		color: var(--primary-color);
+	}
+
+	.actions-cell {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.cards-mobile {
+		display: none;
+		gap: 1rem;
+	}
+
+	.user-card {
+		background: #fff;
+		border-radius: 10px;
+		border: 1px solid #e8edf2;
+		box-shadow: var(--card-shadow);
+		padding: 1rem;
+	}
+
+	.user-card-head {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.8rem;
+		margin-bottom: 0.8rem;
+	}
+
+	.user-card-info {
+		font-size: 0.9rem;
+		color: #566573;
+		margin-bottom: 0.3rem;
+	}
+
+	.form-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1rem;
+	}
+
+	.form-grid .full {
+		grid-column: 1 / -1;
+	}
+
+	.field-error {
+		color: #b42318;
+		font-size: 0.85rem;
+		margin-top: 0.35rem;
+		display: none;
+	}
+
+	.form-control.is-invalid,
+	.form-select.is-invalid,
+	.form-check-input.is-invalid {
+		border-color: #dc3545;
+		box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+	}
+
+	@media (max-width: 992px) {
+		.charts-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.table-users-wrap {
+			display: none;
+		}
+
+		.cards-mobile {
+			display: grid;
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 768px) {
+		.form-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.users-toolbar {
+			align-items: stretch;
+		}
+
+		.users-toolbar .btn {
+			width: 100%;
+		}
+	}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+	{% if request.resolver_match.url_name == 'cosechas_analitica' %}
+	<h1 class="page-title"><i class="bi bi-graph-up-arrow"></i> Analítica de Cosechas</h1>
+	{% else %}
+	<h1 class="page-title"><i class="bi bi-flower1"></i> Gestión de Cosechas</h1>
+	{% endif %}
+</div>
+
+{% if request.resolver_match.url_name == 'cosechas_analitica' %}
+{% include 'partials/analytics_filters.html' with analytics_description='Vista enfocada en tendencias de producción y comparativas históricas de cosecha.' analytics_gestion_url='cosechas_lista' %}
+
+<div class="charts-grid">
+	<div class="chart-card">
+		<h3 class="chart-title"><i class="bi bi-grid"></i> Producción por cuartel (KG)</h3>
+		<div class="chart-wrap"><canvas id="cosechaCuartelChart"></canvas></div>
+	</div>
+	<div class="chart-card">
+		<h3 class="chart-title"><i class="bi bi-tags"></i> Producción por variedad (KG)</h3>
+		<div class="chart-wrap"><canvas id="cosechaVariedadChart"></canvas></div>
+	</div>
+	<div class="chart-card" style="grid-column: 1 / -1;">
+		<h3 class="chart-title"><i class="bi bi-calendar3"></i> Producción mensual (12 meses)</h3>
+		<div class="chart-wrap"><canvas id="cosechaMensualChart"></canvas></div>
+	</div>
+</div>
+
+<div class="analytics-ranking-card">
+	<h3 class="chart-title"><i class="bi bi-table"></i> Ranking de rendimiento</h3>
+	<div class="table-responsive">
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Cuartel</th>
+					<th>Predio</th>
+					<th>KG</th>
+					<th>Bins</th>
+				</tr>
+			</thead>
+			<tbody id="cosechaRankingBody"></tbody>
+		</table>
+	</div>
+</div>
+{% endif %}
+
+{% if request.resolver_match.url_name == 'cosechas_lista' %}
+<div class="dashboard-grid">
+	<div class="stat-card">
+		<div class="stat-icon primary"><i class="bi bi-flower1"></i></div>
+		<div class="stat-content">
+			<h3 id="cardTotalCosechas">{{ resumen.total_cosechas }}</h3>
+			<p>Total cosechas</p>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon success"><i class="bi bi-box2-fill"></i></div>
+		<div class="stat-content">
+			<h3 id="cardTotalKG">{{ resumen.total_kg_cosechados }}</h3>
+			<p>KG cosechados</p>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon warning"><i class="bi bi-archive-fill"></i></div>
+		<div class="stat-content">
+			<h3 id="cardTotalBins">{{ resumen.total_bins_cosechados }}</h3>
+			<p>Bins cosechados</p>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon info"><i class="bi bi-calendar-check"></i></div>
+		<div class="stat-content">
+			<h3 id="cardUltimaCosecha" style="font-size:1rem; line-height:1.2;">{{ resumen.ultima_cosecha }}</h3>
+			<p>Última cosecha</p>
+		</div>
+	</div>
+</div>
+{% endif %}
+
+{% if request.resolver_match.url_name == 'cosechas_lista' %}
+<div class="card">
+	<div class="users-toolbar">
+		<div class="search-box">
+			<i class="bi bi-search"></i>
+			<input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, cuartel, tipo, calidad o destino" oninput="filterCosechas()">
+		</div>
+		<button type="button" class="btn btn-primary" onclick="openAddCosechaModal()">
+			<i class="bi bi-plus-circle-fill"></i> Agregar Cosecha
+		</button>
+	</div>
+
+	<div class="table-responsive table-users-wrap">
+		<table class="table table-users" id="cosechasTable">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Predio</th>
+					<th>Cuartel</th>
+					<th>Fecha Cosecha</th>
+					<th>Tipo Cosecha</th>
+					<th>Cantidad KG</th>
+					<th>Cantidad Bins</th>
+					<th>Calidad</th>
+					<th>Destino</th>
+					<th>Estado</th>
+					<th>Fecha creación</th>
+					<th>Acciones</th>
+				</tr>
+			</thead>
+			<tbody id="cosechasTableBody">
+				{% for cosecha in cosechas %}
+				<tr data-id="{{ cosecha.id }}" data-search="{{ cosecha.cuartel.predio.nombre_predio|lower }} {{ cosecha.cuartel.nombre_cuartel|lower }} {{ cosecha.tipo_cosecha|default:''|lower }} {{ cosecha.calidad|default:''|lower }} {{ cosecha.destino|default:''|lower }} {% if cosecha.estado %}activa{% else %}inactiva{% endif %}">
+					<td>{{ cosecha.id }}</td>
+					<td>{{ cosecha.cuartel.predio.nombre_predio }}</td>
+					<td><div class="user-name">{{ cosecha.cuartel.nombre_cuartel }}</div></td>
+					<td>{{ cosecha.fecha_cosecha|date:'d/m/Y'|default:'-' }}</td>
+					<td>{{ cosecha.tipo_cosecha|default:'-' }}</td>
+					<td>{{ cosecha.cantidad_kg|default:'-' }}</td>
+					<td>{{ cosecha.cantidad_bins|default:'-' }}</td>
+					<td>{{ cosecha.get_calidad_display|default:'-' }}</td>
+					<td>{{ cosecha.get_destino_display|default:'-' }}</td>
+					<td>
+						{% if cosecha.estado %}
+							<span class="badge badge-success">Activa</span>
+						{% else %}
+							<span class="badge badge-warning">Inactiva</span>
+						{% endif %}
+					</td>
+					<td>{{ cosecha.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
+					<td class="actions-cell">
+						<button class="btn btn-sm btn-primary" type="button" onclick="editCosecha({{ cosecha.id }})">
+							<i class="bi bi-pencil-fill"></i> Editar
+						</button>
+						<button class="btn btn-sm btn-secondary" type="button" onclick="toggleCosechaEstado({{ cosecha.id }}, {{ cosecha.estado|yesno:'true,false' }}, '{{ cosecha.cuartel.nombre_cuartel|escapejs }}')">
+							<i class="bi bi-slash-circle-fill"></i> {% if cosecha.estado %}Desactivar{% else %}Activar{% endif %}
+						</button>
+						<button class="btn btn-sm btn-danger" type="button" onclick="deleteCosecha({{ cosecha.id }}, '{{ cosecha.cuartel.nombre_cuartel|escapejs }}')">
+							<i class="bi bi-trash-fill"></i> Eliminar
+						</button>
+					</td>
+				</tr>
+				{% empty %}
+				<tr id="cosechasEmptyRow">
+					<td colspan="12" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cosechas registradas.</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+
+	<div class="cards-mobile" id="cosechasCards">
+		{% for cosecha in cosechas %}
+		<div class="user-card" data-id="{{ cosecha.id }}" data-search="{{ cosecha.cuartel.predio.nombre_predio|lower }} {{ cosecha.cuartel.nombre_cuartel|lower }} {{ cosecha.tipo_cosecha|default:''|lower }} {{ cosecha.calidad|default:''|lower }} {{ cosecha.destino|default:''|lower }} {% if cosecha.estado %}activa{% else %}inactiva{% endif %}">
+			<div class="user-card-head">
+				<div>
+					<div class="user-name">{{ cosecha.cuartel.nombre_cuartel }}</div>
+					<div class="user-card-info">{{ cosecha.cuartel.predio.nombre_predio }}</div>
+				</div>
+				<div>
+					{% if cosecha.estado %}
+						<span class="badge badge-success">Activa</span>
+					{% else %}
+						<span class="badge badge-warning">Inactiva</span>
+					{% endif %}
+				</div>
+			</div>
+			<div class="user-card-info"><strong>ID:</strong> {{ cosecha.id }}</div>
+			<div class="user-card-info"><strong>Fecha cosecha:</strong> {{ cosecha.fecha_cosecha|date:'d/m/Y'|default:'-' }}</div>
+			<div class="user-card-info"><strong>Tipo:</strong> {{ cosecha.tipo_cosecha|default:'-' }}</div>
+			<div class="user-card-info"><strong>KG:</strong> {{ cosecha.cantidad_kg|default:'-' }}</div>
+			<div class="user-card-info"><strong>Bins:</strong> {{ cosecha.cantidad_bins|default:'-' }}</div>
+			<div class="user-card-info"><strong>Calidad:</strong> {{ cosecha.get_calidad_display|default:'-' }}</div>
+			<div class="user-card-info"><strong>Destino:</strong> {{ cosecha.get_destino_display|default:'-' }}</div>
+			<div class="user-card-info"><strong>Creación:</strong> {{ cosecha.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
+			<div class="actions-cell" style="margin-top: 0.9rem;">
+				<button class="btn btn-sm btn-primary" type="button" onclick="editCosecha({{ cosecha.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+				<button class="btn btn-sm btn-secondary" type="button" onclick="toggleCosechaEstado({{ cosecha.id }}, {{ cosecha.estado|yesno:'true,false' }}, '{{ cosecha.cuartel.nombre_cuartel|escapejs }}')">
+					<i class="bi bi-slash-circle-fill"></i> {% if cosecha.estado %}Desactivar{% else %}Activar{% endif %}
+				</button>
+				<button class="btn btn-sm btn-danger" type="button" onclick="deleteCosecha({{ cosecha.id }}, '{{ cosecha.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+			</div>
+		</div>
+		{% endfor %}
+	</div>
+</div>
+
+<div class="modal-overlay" id="cosechaModal">
+	<div class="modal" style="max-width: 860px;">
+		<div class="modal-header">
+			<h2 class="modal-title"><i class="bi bi-flower1"></i> <span id="modalTitle">Agregar Cosecha</span></h2>
+			<button class="modal-close" type="button" onclick="closeCosechaModal()"><i class="bi bi-x-lg"></i></button>
+		</div>
+		<div class="modal-body">
+			<form id="cosechaForm" method="post" novalidate>
+				{% csrf_token %}
+				<input type="hidden" name="cosecha_id" id="cosechaId">
+
+				<div class="form-grid">
+					<div class="form-group">
+						<label class="form-label" for="predio">Predio *</label>
+						<select class="form-control" id="predio" name="predio" required onchange="onPredioChange()">
+							<option value="">Selecciona un predio</option>
+							{% for predio in predios_activos %}
+								<option value="{{ predio.id }}">{{ predio.nombre_predio }}</option>
+							{% endfor %}
+						</select>
+						<small class="field-error" id="error-predio"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="cuartel">Cuartel *</label>
+						<select class="form-control" id="cuartel" name="cuartel" required disabled>
+							<option value="">Selecciona primero un predio</option>
+						</select>
+						<small class="field-error" id="error-cuartel"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="fecha_cosecha">Fecha Cosecha *</label>
+						<input class="form-control" type="date" id="fecha_cosecha" name="fecha_cosecha" required>
+						<small class="field-error" id="error-fecha_cosecha"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="tipo_cosecha">Tipo Cosecha</label>
+						<input class="form-control" type="text" id="tipo_cosecha" name="tipo_cosecha" placeholder="Ej: Melón, Sandía, Uva...">
+						<small class="field-error" id="error-tipo_cosecha"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="cantidad_kg">Cantidad KG</label>
+						<input class="form-control" type="number" id="cantidad_kg" name="cantidad_kg" min="0" step="0.01" placeholder="1500.00">
+						<small class="field-error" id="error-cantidad_kg"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="cantidad_bins">Cantidad Bins</label>
+						<input class="form-control" type="number" id="cantidad_bins" name="cantidad_bins" min="0" step="0.01" placeholder="25.00">
+						<small class="field-error" id="error-cantidad_bins"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="calidad">Calidad</label>
+						<select class="form-control" id="calidad" name="calidad">
+							<option value="">Sin especificar</option>
+							<option value="excelente">Excelente</option>
+							<option value="muy_buena">Muy buena</option>
+							<option value="buena">Buena</option>
+							<option value="regular">Regular</option>
+							<option value="mala">Mala</option>
+						</select>
+						<small class="field-error" id="error-calidad"></small>
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="destino">Destino</label>
+						<select class="form-control" id="destino" name="destino">
+							<option value="">Sin especificar</option>
+							<option value="mercado">Mercado</option>
+							<option value="venta_directa">Venta directa</option>
+							<option value="procesamiento">Procesamiento</option>
+							<option value="almacenamiento">Almacenamiento</option>
+							<option value="otro">Otro</option>
+						</select>
+						<small class="field-error" id="error-destino"></small>
+					</div>
+
+					<div class="form-group full">
+						<label class="form-label" style="display:flex; gap:0.6rem; align-items:center;">
+							<input type="checkbox" id="estado" name="estado" checked>
+							Cosecha activa
+						</label>
+					</div>
+
+					<div class="form-group full">
+						<label class="form-label" for="observaciones">Observaciones</label>
+						<textarea class="form-control" id="observaciones" name="observaciones" rows="3" placeholder="Notas sobre la cosecha..."></textarea>
+						<small class="field-error" id="error-observaciones"></small>
+					</div>
+				</div>
+
+				<div id="formError" class="alert alert-danger" style="display:none; margin-top: 0.5rem;">
+					<i class="bi bi-exclamation-triangle-fill"></i>
+					<span id="formErrorText"></span>
+				</div>
+			</form>
+		</div>
+		<div class="modal-footer">
+			<button class="btn btn-secondary" type="button" onclick="closeCosechaModal()"><i class="bi bi-x-circle"></i> Cancelar</button>
+			<button class="btn btn-primary" type="button" id="saveCosechaBtn" onclick="saveCosecha()"><i class="bi bi-check-circle"></i> Guardar Cosecha</button>
+		</div>
+	</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if request.resolver_match.url_name == 'cosechas_analitica' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endif %}
+<script>
+	const isCosechasGestionView = "{{ request.resolver_match.url_name }}" === 'cosechas_lista';
+	const isCosechasAnaliticaView = "{{ request.resolver_match.url_name }}" === 'cosechas_analitica';
+	const cosechaCharts = {};
+
+	function destroyCosechaChart(id) {
+		if (cosechaCharts[id]) {
+			cosechaCharts[id].destroy();
+			cosechaCharts[id] = null;
+		}
+	}
+
+	function renderCosechaCharts(analytics = {}) {
+		const cuartel = analytics.produccion_cuartel || { labels: [], series: [] };
+		const variedad = analytics.produccion_variedad || { labels: [], series: [] };
+		const mensual = analytics.produccion_mensual || { labels: [], series: [] };
+
+		destroyCosechaChart('cosechaCuartelChart');
+		cosechaCharts.cosechaCuartelChart = new Chart(document.getElementById('cosechaCuartelChart'), {
+			type: 'bar',
+			data: {
+				labels: cuartel.labels,
+				datasets: [{
+					label: 'KG',
+					data: cuartel.series,
+					borderColor: '#16a085',
+					backgroundColor: 'rgba(22, 160, 133, 0.35)',
+				}],
+			},
+			options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+		});
+
+		destroyCosechaChart('cosechaVariedadChart');
+		cosechaCharts.cosechaVariedadChart = new Chart(document.getElementById('cosechaVariedadChart'), {
+			type: 'bar',
+			data: {
+				labels: variedad.labels,
+				datasets: [{
+					label: 'KG',
+					data: variedad.series,
+					borderColor: '#9b59b6',
+					backgroundColor: 'rgba(155, 89, 182, 0.35)',
+				}],
+			},
+			options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+		});
+
+		destroyCosechaChart('cosechaMensualChart');
+		cosechaCharts.cosechaMensualChart = new Chart(document.getElementById('cosechaMensualChart'), {
+			type: 'line',
+			data: {
+				labels: mensual.labels,
+				datasets: [{
+					label: 'KG',
+					data: mensual.series,
+					borderColor: '#e67e22',
+					backgroundColor: 'rgba(230, 126, 34, 0.22)',
+					tension: 0.3,
+					fill: true,
+				}],
+			},
+			options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+		});
+	}
+
+	async function loadCosechaAnalytics() {
+		if (!isCosechasAnaliticaView) return;
+		const params = buildAnalyticsParams();
+		try {
+			const response = await fetch(`/api/cosechas/analitica/?${params.toString()}`);
+			const payload = await response.json();
+			if (!payload.success) return;
+			renderCosechaCharts(payload.analytics || {});
+			renderCosechaRanking(payload.analytics || {});
+		} catch (error) {
+			console.warn('No se pudo cargar analitica de cosechas.');
+		}
+	}
+
+	function buildAnalyticsParams() {
+		const params = new URLSearchParams();
+		const predio = document.getElementById('filterPredio')?.value;
+		const cuartel = document.getElementById('filterCuartel')?.value;
+		const fechaDesde = document.getElementById('filterDesde')?.value;
+		const fechaHasta = document.getElementById('filterHasta')?.value;
+
+		if (predio) params.append('predio', predio);
+		if (cuartel) params.append('cuartel', cuartel);
+		if (fechaDesde) params.append('fecha_desde', fechaDesde);
+		if (fechaHasta) params.append('fecha_hasta', fechaHasta);
+		return params;
+	}
+
+	function syncCuartelesByPredio() {
+		const predio = document.getElementById('filterPredio')?.value;
+		const cuartelSelect = document.getElementById('filterCuartel');
+		if (!cuartelSelect) return;
+
+		Array.from(cuartelSelect.options).forEach((opt, idx) => {
+			if (idx === 0) return;
+			const matches = !predio || String(opt.dataset.predio) === String(predio);
+			opt.hidden = !matches;
+			if (!matches && opt.selected) cuartelSelect.value = '';
+		});
+	}
+
+	function clearAnalyticsFilters() {
+		const predio = document.getElementById('filterPredio');
+		const cuartel = document.getElementById('filterCuartel');
+		const desde = document.getElementById('filterDesde');
+		const hasta = document.getElementById('filterHasta');
+		if (predio) predio.value = '';
+		if (cuartel) cuartel.value = '';
+		if (desde) desde.value = '';
+		if (hasta) hasta.value = '';
+		syncCuartelesByPredio();
+	}
+
+	function renderCosechaRanking(analytics = {}) {
+		const tbody = document.getElementById('cosechaRankingBody');
+		if (!tbody) return;
+
+		const ranking = analytics.ranking_rendimiento || [];
+		if (!ranking.length) {
+			tbody.innerHTML = '<tr><td colspan="4" class="text-center">Sin datos para el filtro seleccionado.</td></tr>';
+			return;
+		}
+
+		tbody.innerHTML = ranking.map((item) => `
+			<tr>
+				<td>${item.cuartel || '-'}</td>
+				<td>${item.predio || '-'}</td>
+				<td>${Number(item.kg || 0).toFixed(2)}</td>
+				<td>${Number(item.bins || 0).toFixed(2)}</td>
+			</tr>
+		`).join('');
+	}
+
+	function csrfToken() {
+		return document.querySelector('#cosechaForm input[name="csrfmiddlewaretoken"]').value;
+	}
+
+	function cosechaSearchText(cosecha) {
+		return [
+			cosecha.predio_nombre || '',
+			cosecha.cuartel_nombre || '',
+			cosecha.tipo_cosecha || '',
+			cosecha.calidad_label || '',
+			cosecha.destino_label || '',
+			cosecha.observaciones || '',
+			cosecha.estado ? 'activa' : 'inactiva'
+		].join(' ').toLowerCase();
+	}
+
+	function estadoBadge(estado) {
+		return estado
+			? '<span class="badge badge-success">Activa</span>'
+			: '<span class="badge badge-warning">Inactiva</span>';
+	}
+
+	function toggleLabel(estado) {
+		return estado ? 'Desactivar' : 'Activar';
+	}
+
+	function resetFieldErrors() {
+		document.querySelectorAll('#cosechaForm .form-control').forEach((field) => {
+			field.classList.remove('is-invalid');
+		});
+		document.querySelectorAll('#cosechaForm .field-error').forEach((el) => {
+			el.style.display = 'none';
+			el.textContent = '';
+		});
+		document.getElementById('formError').style.display = 'none';
+	}
+
+	function showFieldError(fieldName, message) {
+		const input = document.getElementById(fieldName);
+		const error = document.getElementById('error-' + fieldName);
+		if (input) input.classList.add('is-invalid');
+		if (error) {
+			error.textContent = message;
+			error.style.display = 'block';
+		}
+	}
+
+	function showFormError(message) {
+		document.getElementById('formErrorText').textContent = message;
+		document.getElementById('formError').style.display = 'flex';
+	}
+
+	function updateResumenCards(resumen) {
+		if (!resumen) return;
+		const totalCosechas = document.getElementById('cardTotalCosechas');
+		const totalKg = document.getElementById('cardTotalKG');
+		const totalBins = document.getElementById('cardTotalBins');
+		const ultimaCosecha = document.getElementById('cardUltimaCosecha');
+
+		if (totalCosechas) totalCosechas.textContent = resumen.total_cosechas;
+		if (totalKg) totalKg.textContent = resumen.total_kg_cosechados;
+		if (totalBins) totalBins.textContent = resumen.total_bins_cosechados;
+		if (ultimaCosecha) ultimaCosecha.textContent = resumen.ultima_cosecha;
+	}
+
+	function clearCuartelSelect() {
+		const cuartelSelect = document.getElementById('cuartel');
+		cuartelSelect.innerHTML = '<option value="">Selecciona primero un predio</option>';
+		cuartelSelect.disabled = true;
+	}
+
+	async function loadCuartelesByPredio(predioId, selectedCuartelId = '') {
+		const cuartelSelect = document.getElementById('cuartel');
+
+		if (!predioId) {
+			clearCuartelSelect();
+			return;
+		}
+
+		cuartelSelect.disabled = true;
+		cuartelSelect.innerHTML = '<option value="">Cargando cuarteles...</option>';
+
+		try {
+			const response = await fetch(`/predios/${predioId}/cuarteles/`);
+			const data = await response.json();
+
+			if (!data.success) {
+				clearCuartelSelect();
+				showToast(data.error || 'No fue posible cargar los cuarteles.', 'error');
+				return;
+			}
+
+			const options = ['<option value="">Selecciona un cuartel</option>'];
+			data.cuarteles.forEach((cuartel) => {
+				const selected = String(selectedCuartelId) === String(cuartel.id) ? 'selected' : '';
+				options.push(`<option value="${cuartel.id}" ${selected}>${cuartel.nombre_cuartel}</option>`);
+			});
+
+			cuartelSelect.innerHTML = options.join('');
+			cuartelSelect.disabled = false;
+		} catch (error) {
+			clearCuartelSelect();
+			showToast('Ocurrió un error al cargar los cuarteles.', 'error');
+		}
+	}
+
+	function onPredioChange() {
+		const predioId = document.getElementById('predio').value;
+		loadCuartelesByPredio(predioId);
+	}
+
+	function openAddCosechaModal() {
+		resetFieldErrors();
+		document.getElementById('modalTitle').textContent = 'Agregar Cosecha';
+		document.getElementById('cosechaForm').reset();
+		document.getElementById('cosechaId').value = '';
+		document.getElementById('estado').checked = true;
+		clearCuartelSelect();
+		openModal('cosechaModal');
+	}
+
+	function closeCosechaModal() {
+		closeModal('cosechaModal');
+	}
+
+	async function editCosecha(id) {
+		resetFieldErrors();
+		const response = await fetch(`/cosechas/${id}/`);
+		const data = await response.json();
+
+		if (!data.success) {
+			showToast(data.error || 'No fue posible cargar la cosecha.', 'error');
+			return;
+		}
+
+		const c = data.cosecha;
+		document.getElementById('modalTitle').textContent = 'Editar Cosecha';
+		document.getElementById('cosechaId').value = c.id;
+		document.getElementById('predio').value = c.predio_id || '';
+		await loadCuartelesByPredio(c.predio_id, c.cuartel_id);
+		document.getElementById('fecha_cosecha').value = c.fecha_cosecha_iso || '';
+		document.getElementById('tipo_cosecha').value = c.tipo_cosecha || '';
+		document.getElementById('cantidad_kg').value = c.cantidad_kg || '';
+		document.getElementById('cantidad_bins').value = c.cantidad_bins || '';
+		document.getElementById('calidad').value = c.calidad || '';
+		document.getElementById('destino').value = c.destino || '';
+		document.getElementById('observaciones').value = c.observaciones || '';
+		document.getElementById('estado').checked = !!c.estado;
+
+		openModal('cosechaModal');
+	}
+
+	function renderCosechaRow(c) {
+		return `
+			<tr data-id="${c.id}" data-search="${cosechaSearchText(c)}">
+				<td>${c.id}</td>
+				<td>${c.predio_nombre}</td>
+				<td><div class="user-name">${c.cuartel_nombre}</div></td>
+				<td>${c.fecha_cosecha || '-'}</td>
+				<td>${c.tipo_cosecha || '-'}</td>
+				<td>${c.cantidad_kg || '-'}</td>
+				<td>${c.cantidad_bins || '-'}</td>
+				<td>${c.calidad_label || '-'}</td>
+				<td>${c.destino_label || '-'}</td>
+				<td>${estadoBadge(c.estado)}</td>
+				<td>${c.created_at || '-'}</td>
+				<td class="actions-cell">
+					<button class="btn btn-sm btn-primary" type="button" onclick="editCosecha(${c.id})">
+						<i class="bi bi-pencil-fill"></i> Editar
+					</button>
+					<button class="btn btn-sm btn-secondary" type="button" onclick="toggleCosechaEstado(${c.id}, ${c.estado}, '${c.cuartel_nombre.replace(/'/g, "\\'")}')">
+						<i class="bi bi-slash-circle-fill"></i> ${toggleLabel(c.estado)}
+					</button>
+					<button class="btn btn-sm btn-danger" type="button" onclick="deleteCosecha(${c.id}, '${c.cuartel_nombre.replace(/'/g, "\\'")}')">
+						<i class="bi bi-trash-fill"></i> Eliminar
+					</button>
+				</td>
+			</tr>
+		`;
+	}
+
+	function renderCosechaCard(c) {
+		return `
+			<div class="user-card" data-id="${c.id}" data-search="${cosechaSearchText(c)}">
+				<div class="user-card-head">
+					<div>
+						<div class="user-name">${c.cuartel_nombre}</div>
+						<div class="user-card-info">${c.predio_nombre}</div>
+					</div>
+					<div>${estadoBadge(c.estado)}</div>
+				</div>
+				<div class="user-card-info"><strong>ID:</strong> ${c.id}</div>
+				<div class="user-card-info"><strong>Fecha cosecha:</strong> ${c.fecha_cosecha || '-'}</div>
+				<div class="user-card-info"><strong>Tipo:</strong> ${c.tipo_cosecha || '-'}</div>
+				<div class="user-card-info"><strong>KG:</strong> ${c.cantidad_kg || '-'}</div>
+				<div class="user-card-info"><strong>Bins:</strong> ${c.cantidad_bins || '-'}</div>
+				<div class="user-card-info"><strong>Calidad:</strong> ${c.calidad_label || '-'}</div>
+				<div class="user-card-info"><strong>Destino:</strong> ${c.destino_label || '-'}</div>
+				<div class="user-card-info"><strong>Creación:</strong> ${c.created_at || '-'}</div>
+				<div class="actions-cell" style="margin-top: 0.9rem;">
+					<button class="btn btn-sm btn-primary" type="button" onclick="editCosecha(${c.id})"><i class="bi bi-pencil-fill"></i> Editar</button>
+					<button class="btn btn-sm btn-secondary" type="button" onclick="toggleCosechaEstado(${c.id}, ${c.estado}, '${c.cuartel_nombre.replace(/'/g, "\\'")}')">
+						<i class="bi bi-slash-circle-fill"></i> ${toggleLabel(c.estado)}
+					</button>
+					<button class="btn btn-sm btn-danger" type="button" onclick="deleteCosecha(${c.id}, '${c.cuartel_nombre.replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+				</div>
+			</div>
+		`;
+	}
+
+	function removeEmptyState() {
+		const emptyRow = document.getElementById('cosechasEmptyRow');
+		if (emptyRow) emptyRow.remove();
+	}
+
+	function upsertCosechaInDom(cosecha) {
+		removeEmptyState();
+
+		const tbody = document.getElementById('cosechasTableBody');
+		const cards = document.getElementById('cosechasCards');
+		const rowMarkup = renderCosechaRow(cosecha);
+		const cardMarkup = renderCosechaCard(cosecha);
+		const existingRow = tbody.querySelector(`tr[data-id="${cosecha.id}"]`);
+		const existingCard = cards.querySelector(`.user-card[data-id="${cosecha.id}"]`);
+
+		if (existingRow) {
+			existingRow.outerHTML = rowMarkup;
+		} else {
+			tbody.insertAdjacentHTML('afterbegin', rowMarkup);
+		}
+
+		if (existingCard) {
+			existingCard.outerHTML = cardMarkup;
+		} else {
+			cards.insertAdjacentHTML('afterbegin', cardMarkup);
+		}
+
+		filterCosechas();
+	}
+
+	function removeCosechaFromDom(id) {
+		const row = document.querySelector(`#cosechasTableBody tr[data-id="${id}"]`);
+		const card = document.querySelector(`#cosechasCards .user-card[data-id="${id}"]`);
+		if (row) row.remove();
+		if (card) card.remove();
+
+		const rows = document.querySelectorAll('#cosechasTableBody tr[data-id]');
+		if (!rows.length) {
+			document.getElementById('cosechasTableBody').innerHTML =
+				'<tr id="cosechasEmptyRow"><td colspan="12" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cosechas registradas.</td></tr>';
+		}
+	}
+
+	async function saveCosecha() {
+		resetFieldErrors();
+
+		const form = document.getElementById('cosechaForm');
+		const btn = document.getElementById('saveCosechaBtn');
+		const cosechaId = document.getElementById('cosechaId').value;
+		const url = cosechaId ? `/cosechas/${cosechaId}/editar/` : '/cosechas/crear/';
+
+		if (!form.checkValidity()) {
+			form.reportValidity();
+			return;
+		}
+
+		const formData = new FormData(form);
+		btn.disabled = true;
+
+		try {
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: { 'X-CSRFToken': csrfToken() },
+				body: formData,
+			});
+			const data = await response.json();
+
+			if (data.success) {
+				upsertCosechaInDom(data.cosecha);
+				updateResumenCards(data.resumen);
+				closeCosechaModal();
+				showToast(data.message || 'Cosecha guardada correctamente.', 'success');
+				return;
+			}
+
+			if (data.errors) {
+				Object.entries(data.errors).forEach(([field, message]) => {
+					if (field !== '__all__') showFieldError(field, message);
+				});
+				if (data.errors.__all__) showFormError(data.errors.__all__);
+			}
+
+			if (!data.errors) {
+				showFormError(data.error || 'No fue posible guardar la cosecha.');
+			}
+		} catch (error) {
+			showFormError('Ocurrió un error inesperado al guardar.');
+		} finally {
+			btn.disabled = false;
+		}
+	}
+
+	function deleteCosecha(id, nombreCuartel) {
+		showConfirmModal(
+			'Eliminar cosecha',
+			`Se eliminará la cosecha del cuartel <strong>${nombreCuartel}</strong>. Esta acción no se puede deshacer.`,
+			async () => {
+				const response = await fetch(`/cosechas/${id}/eliminar/`, {
+					method: 'POST',
+					headers: { 'X-CSRFToken': csrfToken() },
+				});
+				const data = await response.json();
+				if (data.success) {
+					removeCosechaFromDom(id);
+					updateResumenCards(data.resumen);
+					showToast(data.message || 'Cosecha eliminada.', 'success');
+				} else {
+					showToast(data.error || 'No se pudo eliminar la cosecha.', 'error');
+				}
+			},
+			'Eliminar',
+			'Cancelar'
+		);
+	}
+
+	function toggleCosechaEstado(id, estadoActual, nombreCuartel) {
+		const accion = estadoActual ? 'desactivar' : 'activar';
+		showConfirmModal(
+			`${accion.charAt(0).toUpperCase() + accion.slice(1)} cosecha`,
+			`¿Deseas ${accion} la cosecha del cuartel <strong>${nombreCuartel}</strong>?`,
+			async () => {
+				const response = await fetch(`/cosechas/${id}/toggle-estado/`, {
+					method: 'POST',
+					headers: { 'X-CSRFToken': csrfToken() },
+				});
+				const data = await response.json();
+				if (data.success) {
+					const detailResponse = await fetch(`/cosechas/${id}/`);
+					const detailData = await detailResponse.json();
+					if (detailData.success) {
+						upsertCosechaInDom(detailData.cosecha);
+					}
+					updateResumenCards(data.resumen);
+					showToast(data.message || 'Estado actualizado.', 'success');
+				} else {
+					showToast(data.error || 'No se pudo actualizar el estado.', 'error');
+				}
+			},
+			estadoActual ? 'Desactivar' : 'Activar',
+			'Cancelar'
+		);
+	}
+
+	function filterCosechas() {
+		const term = document.getElementById('searchInput').value.toLowerCase().trim();
+		document.querySelectorAll('#cosechasTableBody tr[data-search]').forEach((row) => {
+			row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+		});
+		document.querySelectorAll('#cosechasCards .user-card[data-search]').forEach((card) => {
+			card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+		});
+	}
+
+	if (isCosechasGestionView) {
+		document.getElementById('cosechaModal').addEventListener('click', function (event) {
+			if (event.target === this) closeCosechaModal();
+		});
+	}
+
+	if (isCosechasAnaliticaView) {
+		document.getElementById('btnApplyFilters')?.addEventListener('click', loadCosechaAnalytics);
+		document.getElementById('btnClearFilters')?.addEventListener('click', () => {
+			clearAnalyticsFilters();
+			loadCosechaAnalytics();
+		});
+		document.getElementById('filterPredio')?.addEventListener('change', syncCuartelesByPredio);
+		syncCuartelesByPredio();
+		loadCosechaAnalytics();
+	}
+</script>
+{% endblock %}

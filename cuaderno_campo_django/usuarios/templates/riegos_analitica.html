@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analitica de Riego - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .stat-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+        min-height: 92px;
+    }
+
+    .stat-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .stat-icon.primary {
+        background-color: rgba(52, 152, 219, 0.12);
+        color: #3498db;
+    }
+
+    .stat-icon.success {
+        background-color: rgba(46, 204, 113, 0.12);
+        color: #2ecc71;
+    }
+
+    .stat-icon.warning {
+        background-color: rgba(241, 196, 15, 0.12);
+        color: #f1c40f;
+    }
+
+    .stat-icon.info {
+        background-color: rgba(26, 188, 156, 0.12);
+        color: #16a085;
+    }
+
+    .stat-icon.dark {
+        background-color: rgba(52, 73, 94, 0.12);
+        color: #34495e;
+    }
+
+    .stat-content h3 {
+        margin: 0;
+        line-height: 1.15;
+        color: var(--primary-color);
+        font-size: 1.35rem;
+        max-width: 260px;
+    }
+
+    .stat-content p {
+        margin: 0.35rem 0 0;
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .chart-card {
+        background: #fff;
+        border: 1px solid #e8edf2;
+        border-radius: 10px;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .chart-card.full {
+        margin-bottom: 1.25rem;
+    }
+
+    .chart-title {
+        margin: 0 0 0.8rem;
+        color: var(--primary-color);
+        font-size: 1rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .chart-wrap {
+        position: relative;
+        width: 100%;
+        min-height: 300px;
+        max-height: 340px;
+    }
+
+    @media (max-width: 992px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .chart-wrap {
+            min-height: 250px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-graph-up-arrow"></i> Analitica de Riego</h1>
+</div>
+
+{% include 'partials/analytics_filters.html' with analytics_description='Vista enfocada en tendencias y comportamiento de consumo de agua.' analytics_gestion_url='riegos_gestion' %}
+
+{{ analytics|json_script:"riego-analytics-data" }}
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title"><i class="bi bi-bar-chart-line-fill"></i> Riegos por dia</h3>
+        <div class="chart-wrap"><canvas id="riegosPorDiaChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <h3 class="chart-title"><i class="bi bi-graph-up"></i> Consumo por cuartel</h3>
+        <div class="chart-wrap"><canvas id="consumoPorCuartelChart"></canvas></div>
+    </div>
+</div>
+
+<div class="chart-card full">
+    <h3 class="chart-title"><i class="bi bi-activity"></i> Tendencia consumo de agua ultimos 30 dias</h3>
+    <div class="chart-wrap"><canvas id="tendencia30DiasChart"></canvas></div>
+</div>
+
+<div class="analytics-ranking-card">
+    <h3 class="chart-title"><i class="bi bi-table"></i> Ranking de consumo por cuartel</h3>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Cuartel</th>
+                    <th>Litros</th>
+                </tr>
+            </thead>
+            <tbody id="riegoRankingBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const analyticsData = JSON.parse(document.getElementById('riego-analytics-data').textContent || '{}');
+    const chartInstances = {};
+
+    function destroyChart(id) {
+        if (chartInstances[id]) {
+            chartInstances[id].destroy();
+            chartInstances[id] = null;
+        }
+    }
+
+    function renderRiegoRanking(data = {}) {
+        const labels = data.consumo_por_cuartel?.labels || [];
+        const values = data.consumo_por_cuartel?.series_litros || [];
+        const tbody = document.getElementById('riegoRankingBody');
+
+        if (!tbody) return;
+
+        if (!labels.length) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center">Sin datos para el filtro seleccionado.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = labels.map((label, idx) => `
+            <tr>
+                <td>${label}</td>
+                <td>${Number(values[idx] || 0).toFixed(2)}</td>
+            </tr>
+        `).join('');
+    }
+
+    function buildCharts(data) {
+        const riegosDia = data.riegos_por_dia || { labels: [], series_riegos: [], series_litros: [] };
+        const consumoCuartel = data.consumo_por_cuartel || { labels: [], series_litros: [] };
+        const tendencia = data.tendencia_30_dias || { labels: [], series_litros: [] };
+
+        destroyChart('riegosPorDiaChart');
+        chartInstances.riegosPorDiaChart = new Chart(document.getElementById('riegosPorDiaChart'), {
+            type: 'bar',
+            data: {
+                labels: riegosDia.labels,
+                datasets: [
+                    {
+                        type: 'line',
+                        label: 'Consumo diario (L)',
+                        data: riegosDia.series_litros,
+                        borderColor: '#16a085',
+                        backgroundColor: 'rgba(22, 160, 133, 0.2)',
+                        tension: 0.35,
+                        fill: true,
+                        yAxisID: 'yLitros',
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Riegos por dia',
+                        data: riegosDia.series_riegos,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.35)',
+                        yAxisID: 'yRiegos',
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    yLitros: {
+                        type: 'linear',
+                        position: 'left',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Litros' },
+                    },
+                    yRiegos: {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: true,
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'N riegos' },
+                    },
+                },
+                plugins: { legend: { position: 'bottom' } },
+            },
+        });
+
+        destroyChart('consumoPorCuartelChart');
+        chartInstances.consumoPorCuartelChart = new Chart(document.getElementById('consumoPorCuartelChart'), {
+            type: 'bar',
+            data: {
+                labels: consumoCuartel.labels,
+                datasets: [
+                    {
+                        label: 'Litros',
+                        data: consumoCuartel.series_litros,
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.35)',
+                    },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true, title: { display: true, text: 'Litros' } },
+                },
+                plugins: { legend: { display: false } },
+            },
+        });
+
+        destroyChart('tendencia30DiasChart');
+        chartInstances.tendencia30DiasChart = new Chart(document.getElementById('tendencia30DiasChart'), {
+            type: 'line',
+            data: {
+                labels: tendencia.labels,
+                datasets: [
+                    {
+                        label: 'Litros',
+                        data: tendencia.series_litros,
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                        tension: 0.3,
+                        fill: true,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Litros' } },
+                },
+                plugins: { legend: { position: 'bottom' } },
+            },
+        });
+    }
+
+    async function loadAnalytics() {
+        const predio = document.getElementById('filterPredio').value;
+        const cuartel = document.getElementById('filterCuartel').value;
+        const fechaDesde = document.getElementById('filterDesde').value;
+        const fechaHasta = document.getElementById('filterHasta').value;
+
+        const params = new URLSearchParams();
+        if (predio) params.append('predio', predio);
+        if (cuartel) params.append('cuartel', cuartel);
+        if (fechaDesde) params.append('fecha_desde', fechaDesde);
+        if (fechaHasta) params.append('fecha_hasta', fechaHasta);
+
+        try {
+            const response = await fetch(`/api/riegos/analitica/?${params.toString()}`);
+            const payload = await response.json();
+            if (!payload.success) return;
+            buildCharts(payload.analytics || {});
+            renderRiegoRanking(payload.analytics || {});
+        } catch (error) {
+            console.warn('No se pudo cargar la analitica de riego.');
+        }
+    }
+
+    function syncCuartelesByPredio() {
+        const predio = document.getElementById('filterPredio').value;
+        const cuartelSelect = document.getElementById('filterCuartel');
+        Array.from(cuartelSelect.options).forEach((opt, idx) => {
+            if (idx === 0) return;
+            const matches = !predio || String(opt.dataset.predio) === String(predio);
+            opt.hidden = !matches;
+            if (!matches && opt.selected) cuartelSelect.value = '';
+        });
+    }
+
+    document.getElementById('btnApplyFilters').addEventListener('click', loadAnalytics);
+    document.getElementById('btnClearFilters').addEventListener('click', () => {
+        document.getElementById('filterPredio').value = '';
+        document.getElementById('filterCuartel').value = '';
+        document.getElementById('filterDesde').value = '';
+        document.getElementById('filterHasta').value = '';
+        syncCuartelesByPredio();
+        loadAnalytics();
+    });
+    document.getElementById('filterPredio').addEventListener('change', syncCuartelesByPredio);
+
+    buildCharts(analyticsData);
+    renderRiegoRanking(analyticsData);
+</script>
+{% endblock %}

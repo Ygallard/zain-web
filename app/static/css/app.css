@@ -88,7 +88,7 @@ html, body, main {
 }
 
 .auth-user-label {
-    display: flex;
+    display: none;
     align-items: center;
     gap: 0.5rem;
     color: #ecf0f1;
@@ -615,22 +615,148 @@ html, body, main {
     justify-content: center;
 }
 
-.cuaderno-card {
-    min-height: calc(100vh - 180px);
+.cuaderno-welcome-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
-.cuaderno-embed-wrap {
-    border: 1px solid #d9e2ec;
-    border-radius: 12px;
-    overflow: hidden;
+.cuaderno-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.2rem;
+    border: 1px solid #dbe7f3;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f3f8fc 0%, #eaf3fb 100%);
+}
+
+.cuaderno-hero-subtitle {
+    color: #516170;
+    font-size: 1rem;
+}
+
+.cuaderno-institutional {
+    color: #2f5d87;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.cuaderno-hero-icon {
+    width: 74px;
+    height: 74px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #3498db, #1d6fa5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.quick-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.quick-metric-card {
     background: #fff;
+    border: 1px solid #e1ebf4;
+    border-radius: 12px;
+    padding: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    box-shadow: 0 3px 10px rgba(44, 62, 80, 0.08);
 }
 
-.cuaderno-iframe {
-    width: 100%;
-    min-height: calc(100vh - 270px);
-    border: 0;
-    display: block;
+.quick-metric-card i {
+    color: #1d6fa5;
+    font-size: 1.4rem;
+}
+
+.quick-metric-label {
+    color: #5e6d7c;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.quick-metric-value {
+    color: #2c3e50;
+    font-size: 1.25rem;
+    line-height: 1.3;
+    font-weight: 700;
+}
+
+.metric-activity {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #314252;
+}
+
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.module-card {
+    background: #fff;
+    border: 1px solid #e6edf5;
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-height: 150px;
+    box-shadow: 0 3px 10px rgba(44, 62, 80, 0.08);
+}
+
+.module-card i {
+    font-size: 1.6rem;
+    color: #2f81bf;
+}
+
+.module-card h4 {
+    margin: 0;
+    color: #2a3f55;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.module-card p {
+    margin: 0;
+    color: #657687;
+    font-size: 0.9rem;
+}
+
+.quick-start-card {
+    background: #fff;
+    border: 1px solid #e5edf4;
+    border-radius: 12px;
+    padding: 1.1rem;
+}
+
+.quick-start-card h3 {
+    margin: 0 0 0.85rem;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.quick-start-card ol {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: #526273;
+}
+
+.quick-start-card li {
+    margin-bottom: 0.35rem;
 }
 
 /* Responsive */
@@ -722,12 +848,24 @@ html, body, main {
         padding: 0.5rem;
     }
 
-    .cuaderno-card {
-        min-height: auto;
+    .cuaderno-hero {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
-    .cuaderno-iframe {
-        min-height: 72vh;
+    .cuaderno-hero-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 14px;
+        font-size: 1.6rem;
+    }
+
+    .quick-metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .modules-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     
     /* Ajustes para el flujómetro en móvil */
@@ -850,6 +988,11 @@ html, body, main {
     .card {
         padding: 0.75rem;
     }
+
+    .quick-metrics-grid,
+    .modules-grid {
+        grid-template-columns: 1fr;
+    }
     
     .card h3 {
         font-size: 0.95rem;
@@ -911,5 +1054,89 @@ html, body, main {
     .options {
         width: 200px;
         padding: 1.5rem;
+    }
+}
+
+/* Sidebar movil tipo off-canvas */
+.app-mobile-toggle {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: linear-gradient(145deg, var(--primary-color), #34495e);
+    color: #eaf4ff;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    z-index: 1202;
+}
+
+.app-sidebar-overlay {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .app-mobile-toggle {
+        display: inline-flex;
+    }
+
+    .app-sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        border: none;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 1200;
+    }
+
+    .options {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(84vw, 300px);
+        height: 100vh;
+        padding: 1.2rem;
+        transform: translateX(-100%);
+        transition: transform 0.28s ease, box-shadow 0.28s ease;
+        z-index: 1201;
+        overflow-y: auto;
+    }
+
+    body.app-sidebar-open .options {
+        transform: translateX(0);
+        box-shadow: 14px 0 28px rgba(0, 0, 0, 0.28);
+    }
+
+    body.app-sidebar-open .app-sidebar-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    body.app-sidebar-open {
+        overflow: hidden;
+    }
+
+    .options ul {
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .main-app {
+        padding-top: 4.25rem;
+    }
+
+    .btn,
+    .form-control,
+    .form-select,
+    button {
+        min-height: 44px;
     }
 }

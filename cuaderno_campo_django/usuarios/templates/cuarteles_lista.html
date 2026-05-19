@@ -1,0 +1,640 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Cuarteles - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .users-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        max-width: 520px;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #7f8c8d;
+    }
+
+    .search-box input {
+        padding-left: 2.4rem;
+    }
+
+    .table-users th,
+    .table-users td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .cards-mobile {
+        display: none;
+        gap: 1rem;
+    }
+
+    .user-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .user-card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .user-card-info {
+        font-size: 0.9rem;
+        color: #566573;
+        margin-bottom: 0.3rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .form-grid .full {
+        grid-column: 1 / -1;
+    }
+
+    .field-error {
+        color: #b42318;
+        font-size: 0.85rem;
+        margin-top: 0.35rem;
+        display: none;
+    }
+
+    .form-control.is-invalid,
+    .form-select.is-invalid,
+    .form-check-input.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+
+    @media (max-width: 992px) {
+        .table-users-wrap {
+            display: none;
+        }
+
+        .cards-mobile {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .users-toolbar {
+            align-items: stretch;
+        }
+
+        .users-toolbar .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-grid-3x3-gap-fill"></i> Gestión de Cuarteles</h1>
+</div>
+
+<div class="card">
+    <div class="users-toolbar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por cuartel, predio, cultivo, variedad o estado" oninput="filterCuarteles()">
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openAddCuartelModal()">
+            <i class="bi bi-plus-circle-fill"></i> Agregar Cuartel
+        </button>
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users" id="cuartelesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Predio</th>
+                    <th>Nombre Cuartel</th>
+                    <th>Tipo Cultivo</th>
+                    <th>Variedad</th>
+                    <th>Forma Riego</th>
+                    <th>Superficie</th>
+                    <th>Estado</th>
+                    <th>Fecha creación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="cuartelesTableBody">
+                {% for cuartel in cuarteles %}
+                <tr data-id="{{ cuartel.id }}" data-search="{{ cuartel.nombre_cuartel|lower }} {{ cuartel.predio.nombre_predio|lower }} {{ cuartel.tipo_cultivo|default:''|lower }} {{ cuartel.variedad|default:''|lower }} {% if cuartel.estado %}activo{% else %}inactivo{% endif %}">
+                    <td>{{ cuartel.id }}</td>
+                    <td>{{ cuartel.predio.nombre_predio }}</td>
+                    <td><div class="user-name">{{ cuartel.nombre_cuartel }}</div></td>
+                    <td>{{ cuartel.tipo_cultivo|default:'-' }}</td>
+                    <td>{{ cuartel.variedad|default:'-' }}</td>
+                    <td>{{ cuartel.get_forma_riego_display|default:'-' }}</td>
+                    <td>{{ cuartel.superficie|default:'-' }}</td>
+                    <td>
+                        {% if cuartel.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ cuartel.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel({{ cuartel.id }})">
+                            <i class="bi bi-pencil-fill"></i> Editar
+                        </button>
+                        <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado({{ cuartel.id }}, {{ cuartel.estado|yesno:'true,false' }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
+                            <i class="bi bi-slash-circle-fill"></i> {% if cuartel.estado %}Desactivar{% else %}Activar{% endif %}
+                        </button>
+                        <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel({{ cuartel.id }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
+                            <i class="bi bi-trash-fill"></i> Eliminar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr id="cuartelesEmptyRow">
+                    <td colspan="10" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cuarteles registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cards-mobile" id="cuartelesCards">
+        {% for cuartel in cuarteles %}
+        <div class="user-card" data-id="{{ cuartel.id }}" data-search="{{ cuartel.nombre_cuartel|lower }} {{ cuartel.predio.nombre_predio|lower }} {{ cuartel.tipo_cultivo|default:''|lower }} {{ cuartel.variedad|default:''|lower }} {% if cuartel.estado %}activo{% else %}inactivo{% endif %}">
+            <div class="user-card-head">
+                <div>
+                    <div class="user-name">{{ cuartel.nombre_cuartel }}</div>
+                    <div class="user-card-info">{{ cuartel.predio.nombre_predio }}</div>
+                </div>
+                <div>
+                    {% if cuartel.estado %}
+                        <span class="badge badge-success">Activo</span>
+                    {% else %}
+                        <span class="badge badge-warning">Inactivo</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="user-card-info"><strong>ID:</strong> {{ cuartel.id }}</div>
+            <div class="user-card-info"><strong>Tipo cultivo:</strong> {{ cuartel.tipo_cultivo|default:'-' }}</div>
+            <div class="user-card-info"><strong>Variedad:</strong> {{ cuartel.variedad|default:'-' }}</div>
+            <div class="user-card-info"><strong>Forma riego:</strong> {{ cuartel.get_forma_riego_display|default:'-' }}</div>
+            <div class="user-card-info"><strong>Superficie:</strong> {{ cuartel.superficie|default:'-' }}</div>
+            <div class="user-card-info"><strong>Creación:</strong> {{ cuartel.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
+            <div class="actions-cell" style="margin-top: 0.9rem;">
+                <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel({{ cuartel.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado({{ cuartel.id }}, {{ cuartel.estado|yesno:'true,false' }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
+                    <i class="bi bi-slash-circle-fill"></i> {% if cuartel.estado %}Desactivar{% else %}Activar{% endif %}
+                </button>
+                <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel({{ cuartel.id }}, '{{ cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- MODAL CUARTEL -->
+<div class="modal-overlay" id="cuartelModal">
+    <div class="modal" style="max-width: 820px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> <span id="modalTitle">Agregar Cuartel</span></h2>
+            <button class="modal-close" type="button" onclick="closeCuartelModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="cuartelForm" method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="cuartel_id" id="cuartelId">
+
+                <div class="form-grid">
+                    <!-- Predio -->
+                    <div class="form-group">
+                        <label class="form-label" for="predio">Predio *</label>
+                        <select class="form-control" id="predio" name="predio" required>
+                            <option value="">Selecciona un predio</option>
+                            {% for predio in predios_activos %}
+                                <option value="{{ predio.id }}">{{ predio.nombre_predio }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="field-error" id="error-predio"></small>
+                    </div>
+
+                    <!-- Nombre cuartel -->
+                    <div class="form-group">
+                        <label class="form-label" for="nombre_cuartel">Nombre Cuartel *</label>
+                        <input class="form-control" type="text" id="nombre_cuartel" name="nombre_cuartel" placeholder="Cuartel 1 Norte" required>
+                        <small class="field-error" id="error-nombre_cuartel"></small>
+                    </div>
+
+                    <!-- Tipo cultivo -->
+                    <div class="form-group">
+                        <label class="form-label" for="tipo_cultivo">Tipo Cultivo</label>
+                        <input class="form-control" type="text" id="tipo_cultivo" name="tipo_cultivo" placeholder="Vid, Manzano, Cerezo…">
+                        <small class="field-error" id="error-tipo_cultivo"></small>
+                    </div>
+
+                    <!-- Variedad -->
+                    <div class="form-group">
+                        <label class="form-label" for="variedad">Variedad</label>
+                        <input class="form-control" type="text" id="variedad" name="variedad" placeholder="Cabernet Sauvignon, Fuji…">
+                        <small class="field-error" id="error-variedad"></small>
+                    </div>
+
+                    <!-- Forma riego -->
+                    <div class="form-group">
+                        <label class="form-label" for="forma_riego">Forma de Riego</label>
+                        <select class="form-control" id="forma_riego" name="forma_riego">
+                            <option value="">Selecciona forma de riego</option>
+                            <option value="goteo">Goteo</option>
+                            <option value="aspersion">Aspersión</option>
+                            <option value="microaspersion">Microaspersión</option>
+                            <option value="surcos">Surcos</option>
+                            <option value="tendido">Tendido</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                        <small class="field-error" id="error-forma_riego"></small>
+                    </div>
+
+                    <!-- Año plantación -->
+                    <div class="form-group">
+                        <label class="form-label" for="anio_plantacion">Año Plantación</label>
+                        <input class="form-control" type="number" id="anio_plantacion" name="anio_plantacion" min="1900" max="2100" placeholder="2010">
+                        <small class="field-error" id="error-anio_plantacion"></small>
+                    </div>
+
+                    <!-- Superficie -->
+                    <div class="form-group">
+                        <label class="form-label" for="superficie">Superficie (há)</label>
+                        <input class="form-control" type="number" id="superficie" name="superficie" min="0" step="0.01" placeholder="5.25">
+                        <small class="field-error" id="error-superficie"></small>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="form-group full">
+                        <label class="form-label" for="descripcion">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3" placeholder="Observaciones generales del cuartel"></textarea>
+                        <small class="field-error" id="error-descripcion"></small>
+                    </div>
+
+                    <!-- Estado -->
+                    <div class="form-group full">
+                        <label class="form-label" style="display:flex; gap:0.6rem; align-items:center;">
+                            <input type="checkbox" id="estado" name="estado" checked>
+                            Cuartel activo
+                        </label>
+                    </div>
+                </div>
+
+                <div id="formError" class="alert alert-danger" style="display:none; margin-top: 0.5rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span id="formErrorText"></span>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeCuartelModal()"><i class="bi bi-x-circle"></i> Cancelar</button>
+            <button class="btn btn-primary" type="button" id="saveCuartelBtn" onclick="saveCuartel()"><i class="bi bi-check-circle"></i> Guardar Cuartel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function csrfToken() {
+        return document.querySelector('#cuartelForm input[name="csrfmiddlewaretoken"]').value;
+    }
+
+    function cuartelSearchText(cuartel) {
+        return [
+            cuartel.nombre_cuartel || '',
+            cuartel.predio_nombre || '',
+            cuartel.tipo_cultivo || '',
+            cuartel.variedad || '',
+            cuartel.forma_riego_label || '',
+            cuartel.estado ? 'activo' : 'inactivo'
+        ].join(' ').toLowerCase();
+    }
+
+    function estadoBadge(estado) {
+        return estado
+            ? '<span class="badge badge-success">Activo</span>'
+            : '<span class="badge badge-warning">Inactivo</span>';
+    }
+
+    function toggleLabel(estado) {
+        return estado ? 'Desactivar' : 'Activar';
+    }
+
+    function resetFieldErrors() {
+        document.querySelectorAll('#cuartelForm .form-control').forEach(function (field) {
+            field.classList.remove('is-invalid');
+        });
+        document.querySelectorAll('#cuartelForm .field-error').forEach(function (el) {
+            el.style.display = 'none';
+            el.textContent = '';
+        });
+        document.getElementById('formError').style.display = 'none';
+    }
+
+    function showFieldError(fieldName, message) {
+        var input = document.getElementById(fieldName);
+        var error = document.getElementById('error-' + fieldName);
+        if (input) input.classList.add('is-invalid');
+        if (error) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+    }
+
+    function showFormError(message) {
+        document.getElementById('formErrorText').textContent = message;
+        document.getElementById('formError').style.display = 'flex';
+    }
+
+    function openAddCuartelModal() {
+        resetFieldErrors();
+        document.getElementById('modalTitle').textContent = 'Agregar Cuartel';
+        document.getElementById('cuartelForm').reset();
+        document.getElementById('cuartelId').value = '';
+        document.getElementById('estado').checked = true;
+        openModal('cuartelModal');
+    }
+
+    function closeCuartelModal() {
+        closeModal('cuartelModal');
+    }
+
+    async function editCuartel(id) {
+        resetFieldErrors();
+        const response = await fetch(`/cuarteles/${id}/`);
+        const data = await response.json();
+
+        if (!data.success) {
+            showToast(data.error || 'No fue posible cargar el cuartel.', 'error');
+            return;
+        }
+
+        const c = data.cuartel;
+        document.getElementById('modalTitle').textContent = 'Editar Cuartel';
+        document.getElementById('cuartelId').value = c.id;
+        document.getElementById('predio').value = c.predio_id || '';
+        document.getElementById('nombre_cuartel').value = c.nombre_cuartel || '';
+        document.getElementById('tipo_cultivo').value = c.tipo_cultivo || '';
+        document.getElementById('variedad').value = c.variedad || '';
+        document.getElementById('forma_riego').value = c.forma_riego || '';
+        document.getElementById('anio_plantacion').value = c.anio_plantacion || '';
+        document.getElementById('superficie').value = c.superficie || '';
+        document.getElementById('descripcion').value = c.descripcion || '';
+        document.getElementById('estado').checked = !!c.estado;
+
+        openModal('cuartelModal');
+    }
+
+    function renderCuartelRow(c) {
+        return `
+            <tr data-id="${c.id}" data-search="${cuartelSearchText(c)}">
+                <td>${c.id}</td>
+                <td>${c.predio_nombre}</td>
+                <td><div class="user-name">${c.nombre_cuartel}</div></td>
+                <td>${c.tipo_cultivo || '-'}</td>
+                <td>${c.variedad || '-'}</td>
+                <td>${c.forma_riego_label || '-'}</td>
+                <td>${c.superficie || '-'}</td>
+                <td>${estadoBadge(c.estado)}</td>
+                <td>${c.created_at || '-'}</td>
+                <td class="actions-cell">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel(${c.id})">
+                        <i class="bi bi-pencil-fill"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado(${c.id}, ${c.estado}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(c.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel(${c.id}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-trash-fill"></i> Eliminar
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+
+    function renderCuartelCard(c) {
+        return `
+            <div class="user-card" data-id="${c.id}" data-search="${cuartelSearchText(c)}">
+                <div class="user-card-head">
+                    <div>
+                        <div class="user-name">${c.nombre_cuartel}</div>
+                        <div class="user-card-info">${c.predio_nombre}</div>
+                    </div>
+                    <div>${estadoBadge(c.estado)}</div>
+                </div>
+                <div class="user-card-info"><strong>ID:</strong> ${c.id}</div>
+                <div class="user-card-info"><strong>Tipo cultivo:</strong> ${c.tipo_cultivo || '-'}</div>
+                <div class="user-card-info"><strong>Variedad:</strong> ${c.variedad || '-'}</div>
+                <div class="user-card-info"><strong>Forma riego:</strong> ${c.forma_riego_label || '-'}</div>
+                <div class="user-card-info"><strong>Superficie:</strong> ${c.superficie || '-'}</div>
+                <div class="user-card-info"><strong>Creación:</strong> ${c.created_at || '-'}</div>
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel(${c.id})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado(${c.id}, ${c.estado}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(c.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel(${c.id}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function removeEmptyState() {
+        const emptyRow = document.getElementById('cuartelesEmptyRow');
+        if (emptyRow) emptyRow.remove();
+    }
+
+    function upsertCuartelInDom(cuartel) {
+        removeEmptyState();
+
+        const tbody = document.getElementById('cuartelesTableBody');
+        const cards = document.getElementById('cuartelesCards');
+        const rowMarkup = renderCuartelRow(cuartel);
+        const cardMarkup = renderCuartelCard(cuartel);
+        const existingRow = tbody.querySelector(`tr[data-id="${cuartel.id}"]`);
+        const existingCard = cards.querySelector(`.user-card[data-id="${cuartel.id}"]`);
+
+        if (existingRow) {
+            existingRow.outerHTML = rowMarkup;
+        } else {
+            tbody.insertAdjacentHTML('afterbegin', rowMarkup);
+        }
+
+        if (existingCard) {
+            existingCard.outerHTML = cardMarkup;
+        } else {
+            cards.insertAdjacentHTML('afterbegin', cardMarkup);
+        }
+
+        filterCuarteles();
+    }
+
+    function removeCuartelFromDom(id) {
+        const row = document.querySelector(`#cuartelesTableBody tr[data-id="${id}"]`);
+        const card = document.querySelector(`#cuartelesCards .user-card[data-id="${id}"]`);
+        if (row) row.remove();
+        if (card) card.remove();
+
+        const rows = document.querySelectorAll('#cuartelesTableBody tr[data-id]');
+        if (!rows.length) {
+            document.getElementById('cuartelesTableBody').innerHTML =
+                '<tr id="cuartelesEmptyRow"><td colspan="10" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cuarteles registrados.</td></tr>';
+        }
+    }
+
+    async function saveCuartel() {
+        resetFieldErrors();
+
+        const form = document.getElementById('cuartelForm');
+        const btn = document.getElementById('saveCuartelBtn');
+        const cuartelId = document.getElementById('cuartelId').value;
+        const url = cuartelId ? `/cuarteles/${cuartelId}/editar/` : '/cuarteles/crear/';
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken() },
+                body: formData,
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                upsertCuartelInDom(data.cuartel);
+                closeCuartelModal();
+                showToast(data.message || 'Cuartel guardado correctamente.', 'success');
+                return;
+            }
+
+            if (data.errors) {
+                Object.entries(data.errors).forEach(function ([field, message]) {
+                    if (field !== '__all__') showFieldError(field, message);
+                });
+                if (data.errors.__all__) showFormError(data.errors.__all__);
+            }
+
+            if (!data.errors) {
+                showFormError(data.error || 'No fue posible guardar el cuartel.');
+            }
+        } catch (error) {
+            showFormError('Ocurrió un error inesperado al guardar.');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function deleteCuartel(id, nombre) {
+        showConfirmModal(
+            'Eliminar cuartel',
+            `Se eliminará el cuartel <strong>${nombre}</strong>. Esta acción no se puede deshacer.`,
+            async function () {
+                const response = await fetch(`/cuarteles/${id}/eliminar/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken() },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    removeCuartelFromDom(id);
+                    showToast(data.message || 'Cuartel eliminado.', 'success');
+                } else {
+                    showToast(data.error || 'No se pudo eliminar el cuartel.', 'error');
+                }
+            },
+            'Eliminar',
+            'Cancelar'
+        );
+    }
+
+    function toggleCuartelEstado(id, estadoActual, nombre) {
+        const accion = estadoActual ? 'desactivar' : 'activar';
+        showConfirmModal(
+            `${accion.charAt(0).toUpperCase() + accion.slice(1)} cuartel`,
+            `¿Deseas ${accion} el cuartel <strong>${nombre}</strong>?`,
+            async function () {
+                const response = await fetch(`/cuarteles/${id}/toggle-estado/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken() },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const detailResponse = await fetch(`/cuarteles/${id}/`);
+                    const detailData = await detailResponse.json();
+                    if (detailData.success) {
+                        upsertCuartelInDom(detailData.cuartel);
+                    }
+                    showToast(data.message || 'Estado actualizado.', 'success');
+                } else {
+                    showToast(data.error || 'No se pudo actualizar el estado.', 'error');
+                }
+            },
+            estadoActual ? 'Desactivar' : 'Activar',
+            'Cancelar'
+        );
+    }
+
+    function filterCuarteles() {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        document.querySelectorAll('#cuartelesTableBody tr[data-search]').forEach(function (row) {
+            row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+        });
+        document.querySelectorAll('#cuartelesCards .user-card[data-search]').forEach(function (card) {
+            card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+        });
+    }
+
+    document.getElementById('cuartelModal').addEventListener('click', function (event) {
+        if (event.target === this) closeCuartelModal();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+<div class="analytics-tools">
+    <p style="margin:0; color:#566573;">{{ analytics_description }}</p>
+    <a class="btn btn-primary" href="{% url analytics_gestion_url %}"><i class="bi bi-sliders"></i> Ir a Gestion</a>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="analytics-filters">
+        <div class="form-group">
+            <label class="form-label" for="filterPredio">Predio</label>
+            <select class="form-control" id="filterPredio">
+                <option value="">Todos</option>
+                {% for predio in predios_activos %}
+                    <option value="{{ predio.id }}">{{ predio.nombre_predio }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="filterCuartel">Cuartel</label>
+            <select class="form-control" id="filterCuartel">
+                <option value="">Todos</option>
+                {% for cuartel in cuarteles_activos %}
+                    <option value="{{ cuartel.id }}" data-predio="{{ cuartel.predio_id }}">{{ cuartel.nombre_cuartel }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="filterDesde">Desde</label>
+            <input class="form-control" id="filterDesde" type="date">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="filterHasta">Hasta</label>
+            <input class="form-control" id="filterHasta" type="date">
+        </div>
+        <div class="form-group full-actions">
+            <button class="btn btn-primary" type="button" id="btnApplyFilters"><i class="bi bi-funnel-fill"></i> Aplicar</button>
+            <button class="btn btn-secondary" type="button" id="btnClearFilters"><i class="bi bi-x-circle"></i> Limpiar</button>
+        </div>
+    </div>
+</div>

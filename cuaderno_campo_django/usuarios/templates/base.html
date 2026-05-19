@@ -6,13 +6,16 @@
     <title>{% block title %}Cuaderno de Campo Digital{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}?v=20260518-responsive-global">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="main-container">
         <!-- NAVBAR -->
         <nav class="navbar">
+            <button class="sidebar-mobile-toggle" type="button" id="sidebarMobileToggle" aria-label="Mostrar u ocultar menú" aria-expanded="false">
+                <i class="bi bi-list"></i>
+            </button>
             <div class="navbar-brand">
                 <i class="bi bi-book-half"></i>
                 Cuaderno de Campo Digital
@@ -56,33 +59,125 @@
         </nav>
 
         <!-- CONTENIDO PRINCIPAL -->
-        <div class="content-wrapper">
+        <div class="content-wrapper" id="contentWrapper">
             <!-- SIDEBAR NAVIGATION -->
-            <aside class="sidebar">
+            <aside class="sidebar" id="sidebarNav">
                 <h3><i class="bi bi-list"></i> Menú</h3>
                 <ul class="sidebar-nav">
+                    <!-- Dashboard (Siempre disponible) -->
                     <li><a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
                         <i class="bi bi-house-fill"></i> Dashboard
                     </a></li>
-                    {% if current_user and current_user.rol == 'admin' %}
+
+                    <!-- Gestión Usuarios (Solo ADMIN) -->
+                    {% if 'usuarios_lista' in sidebar_context.sidebar_items %}
                         <li><a href="{% url 'usuarios_lista' %}" class="{% if request.resolver_match.url_name == 'usuarios_lista' %}active{% endif %}">
                             <i class="bi bi-people-fill"></i> Gestión Usuarios
                         </a></li>
                     {% endif %}
-                    <li><a href="#" onclick="alert('Próximamente disponible')">
-                        <i class="bi bi-map-fill"></i> Predios
-                    </a></li>
-                    <li><a href="#" onclick="alert('Próximamente disponible')">
-                        <i class="bi bi-grid-3x3-gap"></i> Cuarteles
-                    </a></li>
-                    <li><a href="#" onclick="alert('Próximamente disponible')">
-                        <i class="bi bi-droplet-fill"></i> Riego
-                    </a></li>
-                    <li><a href="#" onclick="alert('Próximamente disponible')">
-                        <i class="bi bi-flower1"></i> Cosechas
-                    </a></li>
+
+                    <!-- Predios (ADMIN/PRODUCTOR - PRODUCTOR solo ve los suyos) -->
+                    {% if 'predios_lista' in sidebar_context.sidebar_items %}
+                        <li><a href="{% url 'predios_lista' %}" class="{% if request.resolver_match.url_name == 'predios_lista' %}active{% endif %}">
+                            <i class="bi bi-map-fill"></i> Predios
+                        </a></li>
+                    {% endif %}
+
+                    <!-- Cuarteles (ADMIN/PRODUCTOR - PRODUCTOR solo ve los suyos) -->
+                    {% if 'cuarteles_lista' in sidebar_context.sidebar_items %}
+                        <li><a href="{% url 'cuarteles_lista' %}" class="{% if request.resolver_match.url_name == 'cuarteles_lista' %}active{% endif %}">
+                            <i class="bi bi-grid-3x3-gap-fill"></i> Cuarteles
+                        </a></li>
+                    {% endif %}
+
+                    <!-- Riego (ADMIN/TECNICO/PRODUCTOR - Con filtrado automático) -->
+                    {% if 'riegos_lista' in sidebar_context.sidebar_items %}
+                        <li class="sidebar-group collapsible-group {% if request.resolver_match.url_name == 'riegos_gestion' or request.resolver_match.url_name == 'riegos_lista' or request.resolver_match.url_name == 'riegos_analitica' %}is-current{% endif %}" data-group-key="riego">
+                            <button class="sidebar-group-toggle" type="button" aria-expanded="false">
+                                <span class="group-main">
+                                    <i class="bi bi-droplet-fill"></i> Riego
+                                </span>
+                                <span class="group-arrow" aria-hidden="true">▶</span>
+                            </button>
+                            <ul class="sidebar-subnav">
+                                <li><a href="{% url 'riegos_gestion' %}" class="{% if request.resolver_match.url_name == 'riegos_gestion' or request.resolver_match.url_name == 'riegos_lista' %}active{% endif %}">
+                                    <i class="bi bi-sliders"></i> Gestion
+                                </a></li>
+                                <li><a href="{% url 'riegos_analitica' %}" class="{% if request.resolver_match.url_name == 'riegos_analitica' %}active{% endif %}">
+                                    <i class="bi bi-graph-up-arrow"></i> Analitica
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+
+                    <!-- Fertilización (ADMIN/TECNICO/PRODUCTOR - Con filtrado automático) -->
+                    {% if 'fertilizaciones_lista' in sidebar_context.sidebar_items %}
+                        <li class="sidebar-group collapsible-group {% if request.resolver_match.url_name == 'fertilizaciones_lista' or request.resolver_match.url_name == 'fertilizaciones_analitica' %}is-current{% endif %}" data-group-key="fertilizacion">
+                            <button class="sidebar-group-toggle" type="button" aria-expanded="false">
+                                <span class="group-main">
+                                    <i class="bi bi-flower2"></i> Fertilización
+                                </span>
+                                <span class="group-arrow" aria-hidden="true">▶</span>
+                            </button>
+                            <ul class="sidebar-subnav">
+                                <li><a href="{% url 'fertilizaciones_lista' %}" class="{% if request.resolver_match.url_name == 'fertilizaciones_lista' %}active{% endif %}">
+                                    <i class="bi bi-sliders"></i> Gestion
+                                </a></li>
+                                <li><a href="{% url 'fertilizaciones_analitica' %}" class="{% if request.resolver_match.url_name == 'fertilizaciones_analitica' %}active{% endif %}">
+                                    <i class="bi bi-graph-up-arrow"></i> Analitica
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+
+                    <!-- Cosechas (ADMIN/TECNICO/PRODUCTOR - Con filtrado automático) -->
+                    {% if 'cosechas_lista' in sidebar_context.sidebar_items %}
+                        <li class="sidebar-group collapsible-group {% if request.resolver_match.url_name == 'cosechas_lista' or request.resolver_match.url_name == 'cosechas_analitica' %}is-current{% endif %}" data-group-key="cosechas">
+                            <button class="sidebar-group-toggle" type="button" aria-expanded="false">
+                                <span class="group-main">
+                                    <i class="bi bi-flower1"></i> Cosechas
+                                </span>
+                                <span class="group-arrow" aria-hidden="true">▶</span>
+                            </button>
+                            <ul class="sidebar-subnav">
+                                <li><a href="{% url 'cosechas_lista' %}" class="{% if request.resolver_match.url_name == 'cosechas_lista' %}active{% endif %}">
+                                    <i class="bi bi-sliders"></i> Gestion
+                                </a></li>
+                                <li><a href="{% url 'cosechas_analitica' %}" class="{% if request.resolver_match.url_name == 'cosechas_analitica' %}active{% endif %}">
+                                    <i class="bi bi-graph-up-arrow"></i> Analitica
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+
+                    <!-- Aplicaciones Químicas (ADMIN/TECNICO/PRODUCTOR - Con filtrado automático) -->
+                    {% if 'aplicaciones_quimicas_lista' in sidebar_context.sidebar_items %}
+                        <li class="sidebar-group collapsible-group {% if request.resolver_match.url_name == 'aplicaciones_quimicas_lista' or request.resolver_match.url_name == 'aplicaciones_quimicas_analitica' %}is-current{% endif %}" data-group-key="aplicaciones_quimicas">
+                            <button class="sidebar-group-toggle" type="button" aria-expanded="false">
+                                <span class="group-main">
+                                    <i class="bi bi-shield-fill-check"></i> Aplicaciones Químicas
+                                </span>
+                                <span class="group-arrow" aria-hidden="true">▶</span>
+                            </button>
+                            <ul class="sidebar-subnav">
+                                <li><a href="{% url 'aplicaciones_quimicas_lista' %}" class="{% if request.resolver_match.url_name == 'aplicaciones_quimicas_lista' %}active{% endif %}">
+                                    <i class="bi bi-sliders"></i> Gestion
+                                </a></li>
+                                <li><a href="{% url 'aplicaciones_quimicas_analitica' %}" class="{% if request.resolver_match.url_name == 'aplicaciones_quimicas_analitica' %}active{% endif %}">
+                                    <i class="bi bi-graph-up-arrow"></i> Analitica
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+
+                    {% if 'auditoria_logs' in sidebar_context.sidebar_items %}
+                        <li><a href="{% url 'auditoria_logs' %}" class="{% if request.resolver_match.url_name == 'auditoria_logs' %}active{% endif %}">
+                            <i class="bi bi-shield-check"></i> Auditoría
+                        </a></li>
+                    {% endif %}
                 </ul>
             </aside>
+            <button class="sidebar-backdrop" id="sidebarBackdrop" type="button" aria-label="Cerrar menú lateral"></button>
 
             <!-- MAIN CONTENT -->
             <main class="main-content">
@@ -98,6 +193,24 @@
                 {% block content %}{% endblock %}
             </main>
         </div>
+
+        <footer class="system-footer" role="contentinfo" aria-label="Pie de pagina global">
+            <div class="footer-inner">
+                <div class="footer-col footer-col-left">
+                    <span class="footer-line">&copy; 2026 Zaino Web</span>
+                    <span class="footer-line">Sistema de Monitoreo Agrícola</span>
+                </div>
+
+                <div class="footer-col footer-col-center">
+                    <span class="footer-line footer-brand">Cuaderno de Campo Digital</span>
+                </div>
+
+                <div class="footer-col footer-col-right">
+                    <span class="footer-line">Versión 1.0</span>
+                    <span class="footer-line">Instituto Profesional AIEP</span>
+                </div>
+            </div>
+        </footer>
     </div>
 
     <!-- SCRIPTS -->
@@ -108,8 +221,129 @@
             const dropdown = document.getElementById('userDropdown');
             const button = document.getElementById('userMenuButton');
             const menu = document.getElementById('userMenu');
+            const collapsibleGroups = Array.from(document.querySelectorAll('.collapsible-group'));
+            const mobileToggle = document.getElementById('sidebarMobileToggle');
+            const sidebar = document.getElementById('sidebarNav');
+            const contentWrapper = document.getElementById('contentWrapper');
+            const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+            const storageKey = 'zaino.sidebar.openGroups';
+
+            function isMobileViewport() {
+                return window.matchMedia('(max-width: 768px)').matches;
+            }
+
+            function saveOpenGroups() {
+                const openGroups = collapsibleGroups
+                    .filter(group => group.classList.contains('open'))
+                    .map(group => group.dataset.groupKey)
+                    .filter(Boolean);
+                localStorage.setItem(storageKey, JSON.stringify(openGroups));
+            }
+
+            function setGroupState(group, shouldOpen) {
+                group.classList.toggle('open', shouldOpen);
+                const toggle = group.querySelector('.sidebar-group-toggle');
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+                }
+            }
+
+            function restoreGroupState() {
+                let saved = [];
+                try {
+                    saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                } catch (error) {
+                    saved = [];
+                }
+
+                collapsibleGroups.forEach(group => {
+                    const hasActiveRoute = group.classList.contains('is-current') || !!group.querySelector('.sidebar-subnav a.active');
+                    const isSavedOpen = saved.includes(group.dataset.groupKey);
+                    setGroupState(group, hasActiveRoute || isSavedOpen);
+                });
+            }
+
+            function closeMobileSidebar() {
+                if (!contentWrapper || !mobileToggle) return;
+                contentWrapper.classList.remove('sidebar-open');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('sidebar-lock');
+            }
+
+            function toggleMobileSidebar() {
+                if (!contentWrapper || !mobileToggle) return;
+                const isOpen = contentWrapper.classList.toggle('sidebar-open');
+                mobileToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                document.body.classList.toggle('sidebar-lock', isOpen);
+            }
+
+            function decorateTablesForResponsive() {
+                const allTables = document.querySelectorAll('.main-content table');
+                allTables.forEach(table => {
+                    if (!table.closest('.table-responsive')) {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'table-responsive';
+                        table.parentNode.insertBefore(wrapper, table);
+                        wrapper.appendChild(table);
+                    }
+
+                    const headerCells = Array.from(table.querySelectorAll('thead th'));
+                    if (headerCells.length === 0) {
+                        return;
+                    }
+
+                    const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const keepIndexSet = new Set();
+                    keepIndexSet.add(0);
+                    if (headerCells.length > 1) keepIndexSet.add(1);
+                    if (headerCells.length > 2) keepIndexSet.add(2);
+                    keepIndexSet.add(headerCells.length - 1);
+
+                    rows.forEach(row => {
+                        const cells = Array.from(row.cells);
+                        cells.forEach((cell, idx) => {
+                            const headerText = (headerCells[idx]?.textContent || 'Dato').trim();
+                            cell.setAttribute('data-label', headerText || 'Dato');
+                            const isSecondary = headerCells.length > 4 && !keepIndexSet.has(idx);
+                            cell.setAttribute('data-secondary', isSecondary ? 'true' : 'false');
+                        });
+                    });
+                });
+            }
+
+            function syncMobileTableMode() {
+                const useCardMode = window.matchMedia('(max-width: 576px)').matches;
+                document.querySelectorAll('.main-content .table-responsive').forEach(wrapper => {
+                    wrapper.classList.toggle('table-mobile-cards', useCardMode);
+                });
+            }
+
+            function resizeChartsIfPresent() {
+                const chartRegistry = window.Chart && window.Chart.instances;
+                if (!chartRegistry) {
+                    return;
+                }
+
+                if (chartRegistry instanceof Map) {
+                    chartRegistry.forEach(instance => {
+                        if (instance && typeof instance.resize === 'function') {
+                            instance.resize();
+                        }
+                    });
+                    return;
+                }
+
+                Object.values(chartRegistry).forEach(instance => {
+                    if (instance && typeof instance.resize === 'function') {
+                        instance.resize();
+                    }
+                });
+            }
 
             if (!dropdown || !button || !menu) {
+                if (collapsibleGroups.length > 0) {
+                    restoreGroupState();
+                }
                 return;
             }
 
@@ -122,6 +356,58 @@
             document.addEventListener('click', function () {
                 dropdown.classList.remove('open');
                 button.setAttribute('aria-expanded', 'false');
+            });
+
+            collapsibleGroups.forEach(group => {
+                const toggle = group.querySelector('.sidebar-group-toggle');
+                if (!toggle) return;
+
+                toggle.addEventListener('click', function () {
+                    const isOpen = group.classList.contains('open');
+                    setGroupState(group, !isOpen);
+                    saveOpenGroups();
+                });
+            });
+
+            restoreGroupState();
+
+            if (mobileToggle) {
+                mobileToggle.addEventListener('click', toggleMobileSidebar);
+            }
+
+            if (sidebarBackdrop) {
+                sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+            }
+
+            if (sidebar) {
+                sidebar.addEventListener('click', function (event) {
+                    const targetLink = event.target.closest('a, .sidebar-group-toggle');
+                    if (targetLink && isMobileViewport()) {
+                        closeMobileSidebar();
+                    }
+                });
+            }
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeMobileSidebar();
+                }
+            });
+
+            let responsiveTimer;
+            function syncResponsiveEnhancements() {
+                decorateTablesForResponsive();
+                syncMobileTableMode();
+                resizeChartsIfPresent();
+                if (!isMobileViewport()) {
+                    closeMobileSidebar();
+                }
+            }
+
+            syncResponsiveEnhancements();
+            window.addEventListener('resize', function () {
+                clearTimeout(responsiveTimer);
+                responsiveTimer = setTimeout(syncResponsiveEnhancements, 180);
             });
         })();
     </script>

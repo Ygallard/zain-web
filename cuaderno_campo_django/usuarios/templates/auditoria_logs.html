@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block title %}Auditoría - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filters-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(120px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .filters-grid .full {
+        grid-column: span 2;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    .table-logs th,
+    .table-logs td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .description-cell {
+        max-width: 480px;
+        white-space: normal;
+    }
+
+    .pagination-wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .pagination-links {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+    }
+
+    .badge-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 86px;
+        padding: 0.3rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        color: #fff;
+    }
+
+    .badge-crear {
+        background: #2eaf60;
+    }
+
+    .badge-editar {
+        background: #2f7fd1;
+    }
+
+    .badge-eliminar {
+        background: #cf3d3d;
+    }
+
+    .badge-login {
+        background: #7c4bc4;
+    }
+
+    .badge-logout {
+        background: #607184;
+    }
+
+    @media (max-width: 992px) {
+        .filters-grid {
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+        }
+
+        .filters-grid .full {
+            grid-column: span 2;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .filters-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filters-grid .full {
+            grid-column: span 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-shield-check"></i> Auditoría de Actividad</h1>
+</div>
+
+<div class="card">
+    <form method="get" class="filters-grid">
+        <div class="form-group full">
+            <label class="form-label" for="q">Buscar</label>
+            <input class="form-control" type="text" id="q" name="q" value="{{ q }}" placeholder="Usuario o descripción">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="modulo">Módulo</label>
+            <select class="form-select" id="modulo" name="modulo">
+                <option value="">Todos</option>
+                {% for item in modulos_disponibles %}
+                    <option value="{{ item }}" {% if modulo == item %}selected{% endif %}>{{ item|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="accion">Acción</label>
+            <select class="form-select" id="accion" name="accion">
+                <option value="">Todas</option>
+                {% for item in acciones_disponibles %}
+                    <option value="{{ item }}" {% if accion == item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="fecha_desde">Desde</label>
+            <input class="form-control" type="date" id="fecha_desde" name="fecha_desde" value="{{ fecha_desde }}">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="fecha_hasta">Hasta</label>
+            <input class="form-control" type="date" id="fecha_hasta" name="fecha_hasta" value="{{ fecha_hasta }}">
+        </div>
+
+        <div class="form-group" style="display:flex; align-items:end; gap:0.5rem;">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel-fill"></i> Filtrar</button>
+            <a href="{% url 'auditoria_logs' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Limpiar</a>
+        </div>
+    </form>
+
+    <div style="margin-bottom: 0.8rem; color: #566573;">
+        <strong>Total logs:</strong> {{ total_logs }}
+    </div>
+
+    <div class="table-wrap">
+        <table class="table table-logs">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Módulo</th>
+                    <th>Descripción</th>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.usuario.nombre }} ({{ log.usuario.usuario }})</td>
+                        <td>
+                            <span class="badge-action {% if log.accion == 'CREAR' %}badge-crear{% elif log.accion == 'EDITAR' %}badge-editar{% elif log.accion == 'ELIMINAR' %}badge-eliminar{% elif log.accion == 'LOGIN' %}badge-login{% elif log.accion == 'LOGOUT' %}badge-logout{% else %}badge-logout{% endif %}">
+                                {{ log.accion }}
+                            </span>
+                        </td>
+                        <td>{{ log.modulo|title }}</td>
+                        <td class="description-cell">{{ log.descripcion|default:'-' }}</td>
+                        <td>{{ log.fecha|date:'d/m/Y' }}</td>
+                        <td>{{ log.fecha|date:'H:i:s' }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding:2rem; color:#7f8c8d;">No hay registros para los filtros seleccionados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination-wrap">
+        <div>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</div>
+        <div class="pagination-links">
+            {% if page_obj.has_previous %}
+                <a class="btn btn-sm btn-secondary" href="?page=1&q={{ q|urlencode }}&modulo={{ modulo|urlencode }}&accion={{ accion|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}">Primera</a>
+                <a class="btn btn-sm btn-secondary" href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&modulo={{ modulo|urlencode }}&accion={{ accion|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}">Anterior</a>
+            {% endif %}
+
+            {% if page_obj.has_next %}
+                <a class="btn btn-sm btn-secondary" href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&modulo={{ modulo|urlencode }}&accion={{ accion|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}">Siguiente</a>
+                <a class="btn btn-sm btn-secondary" href="?page={{ page_obj.paginator.num_pages }}&q={{ q|urlencode }}&modulo={{ modulo|urlencode }}&accion={{ accion|urlencode }}&fecha_desde={{ fecha_desde|urlencode }}&fecha_hasta={{ fecha_hasta|urlencode }}">Última</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

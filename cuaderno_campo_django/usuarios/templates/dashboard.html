@@ -4,339 +4,238 @@
 
 {% block extra_css %}
 <style>
+    /* ── Grid de tarjetas ── */
     .dashboard-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.25rem;
         margin-bottom: 2rem;
     }
 
+    /* ── Tarjeta estadística ── */
     .stat-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        box-shadow: var(--card-shadow);
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.5rem 1.25rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         display: flex;
         align-items: center;
-        gap: 1.5rem;
-        transition: all 0.3s ease;
+        gap: 1.1rem;
+        transition: box-shadow 0.25s ease, transform 0.25s ease;
+        border: 1px solid rgba(0,0,0,0.04);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        border-radius: 14px 14px 0 0;
     }
 
     .stat-card:hover {
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.11);
+        transform: translateY(-3px);
     }
 
+    /* Acento superior por color */
+    .sc-blue::after   { background: linear-gradient(90deg,#3498db,#2980b9); }
+    .sc-green::after  { background: linear-gradient(90deg,#2ecc71,#27ae60); }
+    .sc-teal::after   { background: linear-gradient(90deg,#1abc9c,#16a085); }
+    .sc-orange::after { background: linear-gradient(90deg,#e67e22,#d35400); }
+    .sc-purple::after { background: linear-gradient(90deg,#9b59b6,#8e44ad); }
+    .sc-red::after    { background: linear-gradient(90deg,#e74c3c,#c0392b); }
+    .sc-cyan::after   { background: linear-gradient(90deg,#00bcd4,#0097a7); }
+    .sc-indigo::after { background: linear-gradient(90deg,#667eea,#764ba2); }
+
+    /* Icono */
     .stat-icon {
-        font-size: 2.5rem;
-        width: 60px;
-        height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
+        width: 58px; height: 58px;
+        min-width: 58px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 12px;
+        font-size: 1.9rem;
         flex-shrink: 0;
     }
 
-    .stat-icon.primary {
-        background-color: rgba(52, 152, 219, 0.1);
-        color: #3498db;
-    }
+    .si-blue   { background: rgba(52,152,219,.12);  color: #3498db; }
+    .si-green  { background: rgba(46,204,113,.12);  color: #2ecc71; }
+    .si-teal   { background: rgba(26,188,156,.12);  color: #1abc9c; }
+    .si-orange { background: rgba(230,126,34,.12);  color: #e67e22; }
+    .si-purple { background: rgba(155,89,182,.12);  color: #9b59b6; }
+    .si-red    { background: rgba(231,76,60,.12);   color: #e74c3c; }
+    .si-cyan   { background: rgba(0,188,212,.12);   color: #00bcd4; }
+    .si-indigo { background: rgba(102,126,234,.12); color: #667eea; }
 
-    .stat-icon.success {
-        background-color: rgba(46, 204, 113, 0.1);
-        color: #2ecc71;
-    }
-
-    .stat-icon.warning {
-        background-color: rgba(241, 196, 15, 0.1);
-        color: #f1c40f;
-    }
-
-    .stat-icon.danger {
-        background-color: rgba(220, 53, 69, 0.1);
-        color: #dc3545;
-    }
+    /* Contenido */
+    .stat-content { flex: 1; min-width: 0; }
 
     .stat-content h3 {
         font-size: 2rem;
         font-weight: 700;
-        color: var(--primary-color);
+        color: #2c3e50;
         margin: 0;
         line-height: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .stat-content h3.is-date {
+        font-size: 1rem;
+        line-height: 1.35;
+        white-space: normal;
     }
 
     .stat-content p {
-        font-size: 0.9rem;
+        font-size: 0.78rem;
         color: #7f8c8d;
-        margin: 0.5rem 0 0 0;
+        margin: 0.4rem 0 0;
+        font-weight: 600;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
     }
 
+    /* ── Header de bienvenida ── */
     .welcome-section {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        border-radius: 8px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        border-radius: 14px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 1.75rem;
+        box-shadow: 0 8px 24px rgba(102,126,234,.28);
+        position: relative;
+        overflow: hidden;
     }
 
-    .welcome-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin: 0 0 0.5rem 0;
-    }
-
-    .welcome-subtitle {
-        font-size: 1rem;
-        opacity: 0.9;
-        margin: 0;
-    }
-
-    .welcome-icon {
-        font-size: 3rem;
-        opacity: 0.2;
+    .welcome-section::before {
+        content: '\F4C1';
+        font-family: 'bootstrap-icons';
         position: absolute;
-        right: 2rem;
-        top: 2rem;
+        right: 2rem; top: 50%;
+        transform: translateY(-50%);
+        font-size: 5.5rem;
+        opacity: 0.08;
+        pointer-events: none;
     }
 
-    .recent-activity {
-        background: white;
-        border-radius: 8px;
-        box-shadow: var(--card-shadow);
-        padding: 1.5rem;
-    }
+    .welcome-title   { font-size: 1.65rem; font-weight: 700; margin: 0 0 .3rem; }
+    .welcome-subtitle{ font-size: .95rem;  opacity: .85;     margin: 0; }
 
-    .activity-item {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1rem 0;
-        border-bottom: 1px solid #ecf0f1;
-    }
-
-    .activity-item:last-child {
-        border-bottom: none;
-    }
-
-    .activity-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        font-size: 1.2rem;
-    }
-
-    .activity-icon.info {
-        background-color: rgba(52, 152, 219, 0.1);
-        color: #3498db;
-    }
-
-    .activity-icon.success {
-        background-color: rgba(46, 204, 113, 0.1);
-        color: #2ecc71;
-    }
-
-    .activity-icon.warning {
-        background-color: rgba(241, 196, 15, 0.1);
-        color: #f1c40f;
-    }
-
-    .activity-text {
-        flex: 1;
-    }
-
-    .activity-title {
-        font-weight: 600;
-        color: var(--primary-color);
-        margin: 0;
-    }
-
-    .activity-time {
-        font-size: 0.85rem;
-        color: #7f8c8d;
-        margin: 0.3rem 0 0 0;
-    }
-
-    .quick-actions {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 1rem;
-        margin-top: 1.5rem;
-    }
-
-    .action-btn {
-        background: white;
-        border: 2px solid #ecf0f1;
-        border-radius: 8px;
-        padding: 1rem;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-decoration: none;
-        color: inherit;
-    }
-
-    .action-btn:hover {
-        border-color: #3498db;
-        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
-    }
-
-    .action-btn i {
-        font-size: 2rem;
-        color: #3498db;
-        display: block;
-        margin-bottom: 0.5rem;
-    }
-
-    .action-btn span {
-        font-size: 0.9rem;
-        font-weight: 600;
-        display: block;
-        color: var(--primary-color);
-    }
-
-    @media (max-width: 768px) {
-        .dashboard-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .welcome-section {
-            padding: 1.5rem;
-        }
-
-        .welcome-title {
-            font-size: 1.3rem;
-        }
-
-        .welcome-icon {
-            font-size: 2rem;
-            right: 1rem;
-            top: 1rem;
-        }
+    /* ── Responsive ── */
+    @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: repeat(3,1fr); } }
+    @media (max-width: 900px)  { .dashboard-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 576px)  {
+        .dashboard-grid { grid-template-columns: 1fr; }
+        .welcome-section { padding: 1.25rem 1.25rem; }
+        .welcome-title   { font-size: 1.2rem; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- WELCOME SECTION -->
+<!-- ENCABEZADO DE BIENVENIDA -->
 <div class="welcome-section">
-    <div class="welcome-icon">
-        <i class="bi bi-book-half"></i>
-    </div>
     <h1 class="welcome-title">¡Bienvenido, {{ current_user.nombre }}!</h1>
-    <p class="welcome-subtitle">Sistema de Gestión Agrícola Digital - Cuaderno de Campo</p>
+    <p class="welcome-subtitle">Sistema de Gestión Agrícola Digital &middot; Cuaderno de Campo</p>
 </div>
 
-<!-- ESTADÍSTICAS -->
 {% if current_user.rol == 'admin' %}
-<div class="dashboard-grid">
-    <div class="stat-card">
-        <div class="stat-icon primary">
-            <i class="bi bi-people-fill"></i>
-        </div>
-        <div class="stat-content">
-            <h3>{{ total_usuarios|default:"0" }}</h3>
-            <p>Usuarios Registrados</p>
-        </div>
-    </div>
 
-    <div class="stat-card">
-        <div class="stat-icon success">
-            <i class="bi bi-person-check-fill"></i>
-        </div>
+<!-- TARJETAS DE ESTADÍSTICAS -->
+<div class="dashboard-grid">
+
+    <div class="stat-card sc-blue">
+        <div class="stat-icon si-blue"><i class="bi bi-person-check-fill"></i></div>
         <div class="stat-content">
-            <h3>{{ usuarios_activos|default:"0" }}</h3>
+            <h3 id="mUsuariosActivos">{{ usuarios_activos|default:"0" }}</h3>
             <p>Usuarios Activos</p>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon warning">
-            <i class="bi bi-person-fill"></i>
-        </div>
+    <div class="stat-card sc-green">
+        <div class="stat-icon si-green"><i class="bi bi-map-fill"></i></div>
         <div class="stat-content">
-            <h3>{{ administradores|default:"0" }}</h3>
-            <p>Administradores</p>
+            <h3 id="mPredios">{{ predios_count|default:"0" }}</h3>
+            <p>Predios</p>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon danger">
-            <i class="bi bi-person-slash-fill"></i>
-        </div>
+    <div class="stat-card sc-teal">
+        <div class="stat-icon si-teal"><i class="bi bi-grid-3x3-gap-fill"></i></div>
         <div class="stat-content">
-            <h3>{{ usuarios_inactivos|default:"0" }}</h3>
-            <p>Usuarios Inactivos</p>
-        </div>
-    </div>
-</div>
-
-<!-- ACCIONES RÁPIDAS -->
-<div class="card">
-    <h3 style="margin-top: 0;">
-        <i class="bi bi-lightning-fill"></i> Acciones Rápidas
-    </h3>
-    <div class="quick-actions">
-        <a href="{% url 'usuarios_lista' %}" class="action-btn">
-            <i class="bi bi-people-fill"></i>
-            <span>Gestionar Usuarios</span>
-        </a>
-        <a href="{% url 'usuarios_lista' %}" class="action-btn">
-            <i class="bi bi-person-plus-fill"></i>
-            <span>Agregar Usuario</span>
-        </a>
-        <button class="action-btn" onclick="alert('Próximamente disponible')">
-            <i class="bi bi-file-earmark-pdf"></i>
-            <span>Reportes</span>
-        </button>
-        <button class="action-btn" onclick="alert('Próximamente disponible')">
-            <i class="bi bi-gear-fill"></i>
-            <span>Configuración</span>
-        </button>
-    </div>
-</div>
-
-<!-- ACTIVIDAD RECIENTE -->
-<div class="recent-activity">
-    <h3 style="margin-top: 0; margin-bottom: 1rem;">
-        <i class="bi bi-clock-history"></i> Actividad Reciente
-    </h3>
-    
-    <div class="activity-item">
-        <div class="activity-icon success">
-            <i class="bi bi-check-circle-fill"></i>
-        </div>
-        <div class="activity-text">
-            <p class="activity-title">Sistema Iniciado</p>
-            <p class="activity-time">Hoy, {{ now|date:"H:i" }}</p>
+            <h3 id="mCuarteles">{{ cuarteles_count|default:"0" }}</h3>
+            <p>Cuarteles</p>
         </div>
     </div>
 
-    <div class="activity-item">
-        <div class="activity-icon info">
-            <i class="bi bi-info-circle-fill"></i>
-        </div>
-        <div class="activity-text">
-            <p class="activity-title">Base de datos conectada</p>
-            <p class="activity-time">PostgreSQL - {{ usuarios_count|default:"0" }} usuarios</p>
+    <div class="stat-card sc-cyan">
+        <div class="stat-icon si-cyan"><i class="bi bi-droplet-fill"></i></div>
+        <div class="stat-content">
+            <h3 id="mTotalRiegos">{{ total_riegos|default:"0" }}</h3>
+            <p>Total Riegos</p>
         </div>
     </div>
 
-    <div class="activity-item">
-        <div class="activity-icon success">
-            <i class="bi bi-shield-check"></i>
-        </div>
-        <div class="activity-text">
-            <p class="activity-title">Sistema seguro y funcional</p>
-            <p class="activity-time">Todos los módulos operativos</p>
+    <div class="stat-card sc-purple">
+        <div class="stat-icon si-purple"><i class="bi bi-flower2"></i></div>
+        <div class="stat-content">
+            <h3 id="mTotalFertilizaciones">{{ total_fertilizaciones|default:"0" }}</h3>
+            <p>Total Fertilizaciones</p>
         </div>
     </div>
+
+    <div class="stat-card sc-orange">
+        <div class="stat-icon si-orange"><i class="bi bi-flower1"></i></div>
+        <div class="stat-content">
+            <h3 id="mTotalCosechas">{{ total_cosechas|default:"0" }}</h3>
+            <p>Total Cosechas</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-purple">
+        <div class="stat-icon si-purple"><i class="bi bi-box2-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ total_kg_cosechados|default:"0" }} KG</h3>
+            <p>KG Cosechados</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-red">
+        <div class="stat-icon si-red"><i class="bi bi-bezier2"></i></div>
+        <div class="stat-content">
+            <h3 id="mTotalAplicaciones">{{ total_aplicaciones_quimicas|default:"0" }}</h3>
+            <p>Aplicaciones Químicas</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-indigo">
+        <div class="stat-icon si-indigo"><i class="bi bi-activity"></i></div>
+        <div class="stat-content">
+            <h3 id="mUltimaActividad" class="is-date">{{ ultima_actividad_dashboard|default:"-" }}</h3>
+            <p>Última Actividad</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-cyan">
+        <div class="stat-icon si-cyan"><i class="bi bi-droplet-fill"></i></div>
+        <div class="stat-content">
+            <h3 id="mRiegos30Dias">{{ riegos_ultimos_30_dias|default:"0" }}</h3>
+            <p>Riegos Últimos 30 Días</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-indigo">
+        <div class="stat-icon si-indigo"><i class="bi bi-calendar-check-fill"></i></div>
+        <div class="stat-content">
+            <h3 class="is-date">{{ ultima_cosecha_dashboard|default:"-" }}</h3>
+            <p>Última Cosecha</p>
+        </div>
+    </div>
+
 </div>
 
 {% else %}
@@ -387,13 +286,34 @@
 
 {% block extra_js %}
 <script>
-    // Datos para el dashboard
-    const dashboardData = {
-        totalUsuarios: {{ total_usuarios|default:"0" }},
-        usuariosActivos: {{ usuarios_activos|default:"0" }},
-        usuariosInactivos: {{ usuarios_inactivos|default:"0" }}
-    };
+    async function refreshDashboardStats() {
+        try {
+            const response = await fetch('/api/dashboard/stats/');
+            const payload = await response.json();
+            if (!payload.success || !payload.data) return;
 
-    console.log('Dashboard cargado:', dashboardData);
+            const data = payload.data;
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value ?? '-';
+            };
+
+            setText('mUsuariosActivos', data.usuarios_activos);
+            setText('mPredios', data.predios_registrados);
+            setText('mCuarteles', data.cuarteles_activos);
+            setText('mTotalRiegos', data.total_riegos);
+            setText('mTotalFertilizaciones', data.total_fertilizaciones);
+            setText('mTotalCosechas', data.total_cosechas);
+            setText('mTotalAplicaciones', data.total_aplicaciones_quimicas);
+
+            if (data.ultima_actividad) {
+                setText('mUltimaActividad', `${data.ultima_actividad.usuario} - ${data.ultima_actividad.modulo} - ${data.ultima_actividad.accion}`);
+            }
+        } catch (error) {
+            console.warn('No se pudieron cargar métricas en tiempo real del dashboard.');
+        }
+    }
+
+    refreshDashboardStats();
 </script>
 {% endblock %}

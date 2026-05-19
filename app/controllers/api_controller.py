@@ -6,56 +6,109 @@ from app.utils import config
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 settings = config.load_config()
 
 
-def get_auth_credentials():
-    """Obtiene credenciales de login desde variables de entorno."""
-    runtime_settings = config.load_config()
-    username = runtime_settings.get('AUTH_USERNAME') or 'admin'
-    password = runtime_settings.get('AUTH_PASSWORD') or 'admin123'
-    return username, password
+# URL del servidor Django para autenticación centralizada
+# En Django estas rutas se publican en /api/auth/*
+DJANGO_AUTH_API = "http://127.0.0.1:8000/api/auth"
+DJANGO_BASE_URL = "http://127.0.0.1:8000"
 
 
 def is_authenticated():
-    return bool(session.get('authenticated'))
+    """Verifica si el usuario tiene sesión activa"""
+    return bool(session.get('auth_token'))
+
+
+def get_django_auth_endpoint(endpoint_name):
+    """Construye la URL del endpoint de autenticación Django"""
+    return f"{DJANGO_AUTH_API}/{endpoint_name}/"
+
+
+def post_activity_log(modulo, accion, descripcion):
+    """Envía logs de actividad a Django para auditoría centralizada."""
+    token = session.get('auth_token')
+    if not token:
+        return
+
+    try:
+        requests.post(
+            get_django_auth_endpoint('activity'),
+            headers={'Authorization': f'Bearer {token}'},
+            json={
+                'modulo': modulo,
+                'accion': accion,
+                'descripcion': descripcion,
+            },
+            timeout=3,
+        )
+    except requests.exceptions.RequestException:
+        # La auditoría no debe bloquear la operación principal.
+        return
+
+
+def build_cuaderno_sso_url(token):
+    """Construye URL de SSO para abrir Cuaderno con la identidad actual."""
+    if not token:
+        return "http://127.0.0.1:8000/dashboard/"
+    next_path = quote('/dashboard/', safe='')
+    return f"http://127.0.0.1:8000/api/auth/sso/?token={token}&next={next_path}"
+
+
+def get_django_dashboard_stats(token):
+    """Obtiene metricas del dashboard Django utilizando una sesion SSO temporal."""
+    if not token:
+        return None, "Token de autenticacion no disponible"
+
+    sso_url = f"{DJANGO_BASE_URL}/api/auth/sso/?token={quote(token, safe='')}&next=%2Fdashboard%2F"
+    stats_url = f"{DJANGO_BASE_URL}/api/dashboard/stats/"
+
+    try:
+        with requests.Session() as django_session:
+            django_session.get(sso_url, timeout=5, allow_redirects=True)
+            response = django_session.get(
+                stats_url,
+                timeout=5,
+                headers={"X-Requested-With": "XMLHttpRequest"},
+            )
+
+            if response.status_code != 200:
+                return None, f"Dashboard stats no disponible ({response.status_code})"
+
+            payload = response.json()
+            if not payload.get("success"):
+                return None, payload.get("error", "Respuesta invalida de dashboard stats")
+
+            return payload.get("data", {}), None
+    except requests.exceptions.RequestException as exc:
+        return None, str(exc)
 
 
 @app.before_request
 def protect_api_routes():
-    """Protege la API para que requiera sesión activa."""
-    if not request.path.startswith('/api/'):
-        return None
-
-    allowed_paths = {
-        '/api/auth/login',
-        '/api/auth/logout',
-        '/api/auth/status'
-    }
-
-    if request.path in allowed_paths:
-        return None
-
-    if not is_authenticated():
-        return jsonify({
-            'error': 'No autenticado',
-            'details': 'Debes iniciar sesión para usar la API.'
-        }), 401
-
+    """Sin bloqueo global: cada endpoint privado valida sesión internamente."""
     return None
-
 
 @app.route('/api/auth/status', methods=['GET'])
 def auth_status():
+    """Verifica el estado de autenticación actual"""
     return jsonify({
         'authenticated': is_authenticated(),
-        'username': session.get('username') if is_authenticated() else None
+        'user': {
+            'id': session.get('user_id'),
+            'username': session.get('username'),
+            'nombre': session.get('nombre'),
+            'rol': session.get('rol')
+        } if is_authenticated() else None,
+        'sso_url': build_cuaderno_sso_url(session.get('auth_token')) if is_authenticated() else None
     }), 200
 
 
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
+    """Autentica usuario contra Django centralizado"""
     payload = request.get_json(silent=True) or {}
     username = (payload.get('username') or '').strip()
     password = payload.get('password') or ''
@@ -66,32 +119,114 @@ def auth_login():
             'error': 'Usuario y contraseña son obligatorios.'
         }), 400
 
-    expected_user, expected_password = get_auth_credentials()
-
-    if username != expected_user or password != expected_password:
+    # Llamar a endpoint de autenticación de Django
+    try:
+        response = requests.post(
+            get_django_auth_endpoint('login'),
+            json={'username': username, 'password': password},
+            timeout=5
+        )
+    except requests.exceptions.RequestException as e:
         return jsonify({
             'success': False,
-            'error': 'Credenciales inválidas.'
+            'error': f'No se pudo conectar con servidor de autenticación: {str(e)}'
+        }), 500
+
+    content_type = response.headers.get('Content-Type', '')
+    is_json_response = 'application/json' in content_type.lower()
+
+    if response.status_code != 200:
+        if is_json_response:
+            error_payload = response.json()
+            error_message = error_payload.get('error', 'Credenciales inválidas.')
+        else:
+            error_message = 'Error de autenticación centralizada. Intenta nuevamente.'
+        return jsonify({
+            'success': False,
+            'error': error_message
         }), 401
 
-    session['authenticated'] = True
-    session['username'] = username
+    # Procesar respuesta de Django
+    if not is_json_response:
+        return jsonify({
+            'success': False,
+            'error': 'Respuesta inválida del servidor de autenticación.'
+        }), 502
+
+    auth_data = response.json()
+    if not auth_data.get('success'):
+        return jsonify({
+            'success': False,
+            'error': auth_data.get('error', 'Error de autenticación')
+        }), 401
+
+    # Guardar datos en sesión de Flask
+    user_data = auth_data.get('user', {})
+    session['auth_token'] = auth_data.get('token')
+    session['user_id'] = user_data.get('id')
+    session['username'] = user_data.get('username')
+    session['nombre'] = user_data.get('nombre')
+    session['rol'] = user_data.get('rol')
     session.permanent = True
 
     return jsonify({
         'success': True,
-        'username': username
+        'token': auth_data.get('token'),
+        'user': user_data,
+        'sso_url': build_cuaderno_sso_url(auth_data.get('token'))
     }), 200
 
 
 @app.route('/api/auth/logout', methods=['POST'])
 def auth_logout():
-    session.pop('authenticated', None)
+    """Cierra sesión"""
+    # Notificar a Django que se cerró sesión
+    token = session.get('auth_token')
+    if token:
+        try:
+            requests.post(
+                get_django_auth_endpoint('logout'),
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=5
+            )
+        except:
+            pass  # Continuar aunque falle la notificación
+    
+    # Limpiar sesión de Flask
+    session.pop('auth_token', None)
+    session.pop('user_id', None)
     session.pop('username', None)
+    session.pop('nombre', None)
+    session.pop('rol', None)
 
-    return jsonify({
-        'success': True
-    }), 200
+    return jsonify({'success': True}), 200
+
+
+@app.route('/api/cuaderno/quick-stats', methods=['GET'])
+def cuaderno_quick_stats():
+    """Retorna metricas rapidas para el panel de bienvenida del Cuaderno."""
+    if not is_authenticated():
+        return jsonify({
+            'error': 'No autenticado',
+            'details': 'Debes iniciar sesión para acceder al Cuaderno de Campo.'
+        }), 401
+
+    token = session.get('auth_token')
+    stats, error = get_django_dashboard_stats(token)
+
+    if error:
+        return jsonify({
+            'success': True,
+            'data': {
+                'usuarios_activos': '-',
+                'predios_registrados': '-',
+                'cuarteles_activos': '-',
+                'ultima_actividad': None,
+            },
+            'warning': error,
+        }), 200
+
+    return jsonify({'success': True, 'data': stats}), 200
 
 # Cache para reducir llamadas a la API de Arduino
 flowmeter_cache = {
@@ -251,7 +386,7 @@ def get_flowmeter_data():
         
         # Guardar en caché
         set_flowmeter_cache(flowmeter_data)
-        
+
         return jsonify({
             "success": True,
             "data": flowmeter_data,
@@ -519,6 +654,14 @@ def generar_informe():
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(informe, f, indent=2, ensure_ascii=False)
         
+        if is_authenticated():
+            username = session.get('username', 'usuario')
+            post_activity_log(
+                modulo='flujometro',
+                accion='CREAR',
+                descripcion=f"{username} genero informe de flujometro: {informe['nombre']}.",
+            )
+
         return jsonify({
             "success": True,
             "message": "Informe generado exitosamente",
@@ -587,7 +730,15 @@ def delete_informe(informe_id):
             }), 404
         
         os.remove(filepath)
-        
+
+        if is_authenticated():
+            username = session.get('username', 'usuario')
+            post_activity_log(
+                modulo='flujometro',
+                accion='ELIMINAR',
+                descripcion=f"{username} elimino informe de flujometro: {informe_id}.",
+            )
+
         return jsonify({
             "success": True,
             "message": "Informe eliminado exitosamente"
