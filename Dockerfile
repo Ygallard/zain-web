@@ -17,4 +17,7 @@ EXPOSE 8000
 
 USER 10001:10001
 
+ENV HOME=/tmp \
+	XDG_CONFIG_HOME=/tmp
+
 CMD ["sh", "-c", "gunicorn cuaderno_campo_django.wsgi:application --bind 0.0.0.0:${PORT}"]
