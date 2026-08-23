@@ -4,7 +4,8 @@ from importlib.util import find_spec
 
 from django.contrib import messages
 from django.contrib.auth.hashers import check_password
-from django.db.models import Count, ExpressionWrapper, F, FloatField, Q, Sum, Value
+from decimal import Decimal
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, FloatField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncMonth
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
@@ -26,17 +27,25 @@ from .permissions import (
     user_owns_fertilizacion,
     user_owns_cosecha,
     user_owns_aplicacion_quimica,
+    user_owns_labor_agricola,
     can_manage_predios,
     can_manage_cuarteles,
     can_manage_riegos,
     can_manage_fertilizaciones,
     can_manage_cosechas,
     can_manage_aplicaciones_quimicas,
+    can_manage_labores_agricolas,
+    get_filtered_labores_agricolas,
     get_sidebar_context,
+    can_comment,
+    can_send_notifications,
+    get_registro_y_productor,
+    user_can_view_registro,
 )
 from .forms import (
     AplicacionQuimicaCreateForm,
     AplicacionQuimicaUpdateForm,
+    ComentarioTecnicoForm,
     CosechaCreateForm,
     CosechaUpdateForm,
     CuartelCreateForm,
@@ -44,14 +53,29 @@ from .forms import (
     FertilizacionCreateForm,
     FertilizacionUpdateForm,
     LoginForm,
+    NotificacionForm,
     PredioCreateForm,
     PredioUpdateForm,
     RiegoCreateForm,
     RiegoUpdateForm,
+    LaborAgricolaCreateForm,
+    LaborAgricolaUpdateForm,
     UsuarioCreateForm,
     UsuarioUpdateForm,
 )
-from .models import AplicacionQuimica, Cosecha, Cuartel, Fertilizacion, LogActividad, Predio, Riego, Usuario
+from .models import (
+    AplicacionQuimica,
+    ComentarioTecnico,
+    Cosecha,
+    Cuartel,
+    Fertilizacion,
+    LaborAgricola,
+    LogActividad,
+    Notificacion,
+    Predio,
+    Riego,
+    Usuario,
+)
 
 
 def get_current_user(request):
@@ -115,7 +139,7 @@ def build_month_series(queryset, date_field, aggregate_name, aggregate_expressio
     )
 
     values_by_month = {
-        item["periodo"].date().replace(day=1): float(item["valor"] or 0)
+        (item["periodo"].date() if hasattr(item["periodo"], "date") else item["periodo"]).replace(day=1): float(item["valor"] or 0)
         for item in rows
     }
 
@@ -251,14 +275,27 @@ def dashboard_view(request):
         )
     
     elif current_user.rol == Usuario.ROL_TECNICO:
-        # Técnico ve todos los registros
+        # PRODESAL: supervision y apoyo tecnico sobre todos los productores
+        hoy = timezone.localdate()
+        hace_7_dias = hoy - timedelta(days=6)
+
         context.update({
+            "productores_supervisados": Usuario.objects.filter(rol=Usuario.ROL_PRODUCTOR, estado=True).count(),
+            "predios_count": Predio.objects.count(),
+            "cuarteles_count": Cuartel.objects.filter(estado=True).count(),
+            "total_cosechas": Cosecha.objects.count(),
             "total_riegos": Riego.objects.count(),
             "total_fertilizaciones": Fertilizacion.objects.count(),
-            "total_cosechas": Cosecha.objects.count(),
             "total_aplicaciones_quimicas": AplicacionQuimica.objects.count(),
+            "riegos_recientes": Riego.objects.filter(fecha_riego__gte=hace_7_dias).count(),
+            "fertilizaciones_recientes": Fertilizacion.objects.filter(fecha_aplicacion__gte=hace_7_dias).count(),
+            "aplicaciones_recientes": AplicacionQuimica.objects.filter(fecha_aplicacion__gte=hace_7_dias).count(),
+            "notificaciones_enviadas_pendientes": Notificacion.objects.filter(
+                usuario_generador=current_user, leido=False
+            ).count(),
+            "observaciones_realizadas": ComentarioTecnico.objects.filter(usuario_prodesal=current_user).count(),
         })
-    
+
     elif current_user.rol == Usuario.ROL_PRODUCTOR:
         # Productor solo ve sus datos
         mis_predios = Predio.objects.filter(usuario_id=current_user.id)
@@ -277,6 +314,8 @@ def dashboard_view(request):
             "total_kg_cosechados": mis_cosechas.aggregate(total=Sum("cantidad_kg"))["total"],
             "total_bins_cosechados": mis_cosechas.aggregate(total=Sum("cantidad_bins"))["total"],
             "total_aplicaciones_quimicas": mis_aplicaciones.count(),
+            "notificaciones_no_leidas": Notificacion.objects.filter(productor=current_user, leido=False).count(),
+            "observaciones_no_leidas": ComentarioTecnico.objects.filter(productor=current_user, leido=False).count(),
         })
     
     return render(request, "dashboard.html", context)
@@ -350,7 +389,7 @@ def acceso_denegado_view(request):
     )
 
 
-@role_required(Usuario.ROL_ADMIN)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO)
 def auditoria_logs_view(request):
     q = request.GET.get("q", "").strip()
     modulo = request.GET.get("modulo", "").strip()
@@ -407,17 +446,34 @@ def auditoria_logs_view(request):
     return render(request, "auditoria_logs.html", context)
 
 
-@login_required_custom
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO)
+def auditoria_log_detail_view(request, pk):
+    try:
+        log = LogActividad.objects.select_related("usuario").get(pk=pk)
+        return JsonResponse(
+            {
+                "success": True,
+                "log": {
+                    "id": log.id,
+                    "usuario_nombre": log.usuario.nombre,
+                    "usuario_login": log.usuario.usuario,
+                    "usuario_rol": log.usuario.rol,
+                    "accion": log.accion,
+                    "modulo": log.modulo,
+                    "descripcion": log.descripcion or "",
+                    "fecha": log.fecha.strftime("%d/%m/%Y") if log.fecha else "-",
+                    "hora": log.fecha.strftime("%H:%M:%S") if log.fecha else "-",
+                    "fecha_hora": log.fecha.strftime("%d/%m/%Y %H:%M:%S") if log.fecha else "-",
+                },
+            }
+        )
+    except LogActividad.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Registro de auditoría no encontrado"}, status=404)
+
+
+@role_required(Usuario.ROL_ADMIN)
 def usuario_list_view(request):
     current_user = get_current_user(request)
-    if not current_user:
-        messages.error(request, "Tu sesión no es válida. Vuelve a iniciar sesión.")
-        return redirect("login")
-
-    # Solo administradores pueden ver la lista de usuarios
-    if current_user.rol != Usuario.ROL_ADMIN:
-        messages.error(request, "No tienes permisos para acceder a esta sección.")
-        return redirect("dashboard")
 
     q = request.GET.get("q", "").strip()
     queryset = Usuario.objects.all()
@@ -436,6 +492,34 @@ def usuario_list_view(request):
         "usuarios_lista.html",
         {
             "usuarios": queryset,
+            "q": q,
+            "current_user": current_user,
+            "sidebar_context": get_sidebar_context(request),
+            "can_manage": True,
+        },
+    )
+
+
+@role_required(Usuario.ROL_TECNICO)
+def productores_lista_view(request):
+    """Listado de solo lectura para que PRODESAL vea y notifique a los productores."""
+    current_user = get_current_user(request)
+    q = request.GET.get("q", "").strip()
+
+    queryset = Usuario.objects.filter(rol=Usuario.ROL_PRODUCTOR)
+    if q:
+        queryset = queryset.filter(
+            Q(rut__icontains=q)
+            | Q(nombre__icontains=q)
+            | Q(usuario__icontains=q)
+            | Q(sector__icontains=q)
+        )
+
+    return render(
+        request,
+        "productores_lista.html",
+        {
+            "productores": queryset.order_by("nombre"),
             "q": q,
             "current_user": current_user,
             "sidebar_context": get_sidebar_context(request),
@@ -573,6 +657,52 @@ def usuario_toggle_estado_view(request, pk):
         return JsonResponse({"success": False, "error": "Usuario no encontrado"}, status=404)
 
 
+ROL_LABELS = {
+    Usuario.ROL_ADMIN: "Administrador",
+    Usuario.ROL_TECNICO: "PRODESAL",
+    Usuario.ROL_PRODUCTOR: "Productor",
+}
+
+
+def build_responsable_info(usuario):
+    """Datos del usuario/productor que realmente es dueño del registro (no quien lo consulta)."""
+    if not usuario:
+        return {"responsable_id": None, "responsable_nombre": "-", "responsable_rol": "-"}
+
+    return {
+        "responsable_id": usuario.id,
+        "responsable_nombre": usuario.nombre,
+        "responsable_rol": ROL_LABELS.get(usuario.rol, usuario.rol),
+    }
+
+
+def build_ubicacion_info(predio, cuartel_nombre=""):
+    """Ubicacion asociada a un registro a traves de su predio (nombre, sector, coordenadas)."""
+    if not predio:
+        return {
+            "ubicacion_predio_nombre": "",
+            "ubicacion_sector": "",
+            "ubicacion_direccion": "",
+            "ubicacion_cuartel": cuartel_nombre or "",
+            "ubicacion_lat": "",
+            "ubicacion_lng": "",
+            "ubicacion_disponible": False,
+        }
+
+    lat = predio.geolocalizacion_lat
+    lng = predio.geolocalizacion_lng
+
+    return {
+        "ubicacion_predio_nombre": predio.nombre_predio,
+        "ubicacion_sector": predio.usuario.sector if predio.usuario_id and predio.usuario.sector else "",
+        "ubicacion_direccion": predio.ubicacion or "",
+        "ubicacion_cuartel": cuartel_nombre or "",
+        "ubicacion_lat": str(lat) if lat is not None else "",
+        "ubicacion_lng": str(lng) if lng is not None else "",
+        "ubicacion_disponible": bool(predio.ubicacion or lat is not None or lng is not None or cuartel_nombre),
+    }
+
+
 def serialize_predio(predio):
     return {
         "id": predio.id,
@@ -582,10 +712,18 @@ def serialize_predio(predio):
         "nombre_predio": predio.nombre_predio,
         "ubicacion": predio.ubicacion or "",
         "superficie": str(predio.superficie) if predio.superficie is not None else "",
+        "superficie_hectareas": str(predio.superficie_hectareas) if predio.superficie_hectareas is not None else "",
+        "inscripcion_cbr": predio.inscripcion_cbr or "",
+        "inscripcion_agua": predio.inscripcion_agua or "",
+        "geolocalizacion_lat": str(predio.geolocalizacion_lat) if predio.geolocalizacion_lat is not None else "",
+        "geolocalizacion_lng": str(predio.geolocalizacion_lng) if predio.geolocalizacion_lng is not None else "",
         "descripcion": predio.descripcion or "",
         "estado": bool(predio.estado),
         "created_at": predio.created_at.strftime("%d/%m/%Y %H:%M") if predio.created_at else "-",
+        **build_responsable_info(predio.usuario),
+        **build_ubicacion_info(predio),
     }
+
 
 
 @role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
@@ -738,6 +876,7 @@ def serialize_cuartel(cuartel):
         "predio_nombre": cuartel.predio.nombre_predio,
         "nombre_cuartel": cuartel.nombre_cuartel,
         "tipo_cultivo": cuartel.tipo_cultivo or "",
+        "tipo_cultivo_label": cuartel.get_tipo_cultivo_display() if cuartel.tipo_cultivo else "",
         "variedad": cuartel.variedad or "",
         "forma_riego": cuartel.forma_riego or "",
         "forma_riego_label": cuartel.get_forma_riego_display() if cuartel.forma_riego else "-",
@@ -746,6 +885,8 @@ def serialize_cuartel(cuartel):
         "descripcion": cuartel.descripcion or "",
         "estado": bool(cuartel.estado),
         "created_at": cuartel.created_at.strftime("%d/%m/%Y %H:%M") if cuartel.created_at else "-",
+        **build_responsable_info(cuartel.predio.usuario),
+        **build_ubicacion_info(cuartel.predio, cuartel.nombre_cuartel),
     }
 
 
@@ -769,7 +910,7 @@ def cuartel_list_view(request):
     )
 
 
-@role_required(Usuario.ROL_ADMIN)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cuartel_create_view(request):
     if request.method != "POST":
         return redirect("cuarteles_lista")
@@ -799,16 +940,19 @@ def cuartel_detail_view(request, pk):
         return access_denied_response(request, "No autorizado para acceder a este cuartel.")
 
     try:
-        cuartel = Cuartel.objects.select_related("predio").get(pk=pk)
+        cuartel = Cuartel.objects.select_related("predio", "predio__usuario").get(pk=pk)
         return JsonResponse({"success": True, "cuartel": serialize_cuartel(cuartel)})
     except Cuartel.DoesNotExist:
         return JsonResponse({"success": False, "error": "Cuartel no encontrado"}, status=404)
 
 
-@role_required(Usuario.ROL_ADMIN)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cuartel_update_view(request, pk):
     if request.method != "POST":
         return redirect("cuarteles_lista")
+
+    if not user_owns_cuartel(request, pk):
+        return access_denied_response(request, "No autorizado para modificar este cuartel.")
 
     try:
         cuartel = Cuartel.objects.get(pk=pk)
@@ -832,10 +976,13 @@ def cuartel_update_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cuartel_delete_view(request, pk):
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    if not user_owns_cuartel(request, pk):
+        return access_denied_response(request, "No autorizado para eliminar este cuartel.")
 
     try:
         cuartel = Cuartel.objects.get(pk=pk)
@@ -853,10 +1000,13 @@ def cuartel_delete_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cuartel_toggle_estado_view(request, pk):
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    if not user_owns_cuartel(request, pk):
+        return access_denied_response(request, "No autorizado para cambiar estado de este cuartel.")
 
     try:
         cuartel = Cuartel.objects.get(pk=pk)
@@ -881,7 +1031,7 @@ def cuartel_toggle_estado_view(request, pk):
 def build_riego_resumen(queryset=None):
     qs = queryset if queryset is not None else Riego.objects.all()
     litros_expr = ExpressionWrapper(
-        Coalesce(F("horas_riego"), Value(0.0)) * Coalesce(F("caudal"), Value(0.0)),
+        (Coalesce(F("minutos_riego"), Value(0.0)) / Value(60.0)) * Coalesce(F("caudal"), Value(0.0)),
         output_field=FloatField(),
     )
 
@@ -927,7 +1077,7 @@ def build_riego_resumen(queryset=None):
 
 def build_riego_analytics(queryset):
     litros_expr = ExpressionWrapper(
-        Coalesce(F("horas_riego"), Value(0.0)) * Coalesce(F("caudal"), Value(0.0)),
+        (Coalesce(F("minutos_riego"), Value(0.0)) / Value(60.0)) * Coalesce(F("caudal"), Value(0.0)),
         output_field=FloatField(),
     )
 
@@ -987,9 +1137,9 @@ def build_riego_analytics(queryset):
 
 
 def serialize_riego(riego):
-    horas = float(riego.horas_riego or 0)
+    minutos = float(riego.minutos_riego or 0)
     caudal = float(riego.caudal or 0)
-    litros = round(horas * caudal, 2)
+    litros = round((minutos / 60.0) * caudal, 2)
 
     return {
         "id": riego.id,
@@ -1001,12 +1151,15 @@ def serialize_riego(riego):
         "fecha_riego": riego.fecha_riego.strftime("%d/%m/%Y") if riego.fecha_riego else "-",
         "fecha_riego_iso": riego.fecha_riego.strftime("%Y-%m-%d") if riego.fecha_riego else "",
         "tipo_riego": riego.tipo_riego or "",
-        "horas_riego": str(riego.horas_riego) if riego.horas_riego is not None else "",
+        "tipo_riego_label": riego.get_tipo_riego_display() if riego.tipo_riego else "",
+        "minutos_riego": str(riego.minutos_riego) if riego.minutos_riego is not None else "",
         "caudal": str(riego.caudal) if riego.caudal is not None else "",
         "litros": litros,
         "observaciones": riego.observaciones or "",
         "estado": bool(riego.estado),
         "created_at": riego.created_at.strftime("%d/%m/%Y %H:%M") if riego.created_at else "-",
+        **build_responsable_info(riego.cuartel.predio.usuario),
+        **build_ubicacion_info(riego.cuartel.predio, riego.cuartel.nombre_cuartel),
     }
 
 
@@ -1015,7 +1168,7 @@ def serialize_riego(riego):
 
 def get_riego_litros_expression():
     return ExpressionWrapper(
-        Coalesce(F("horas_riego"), Value(0.0)) * Coalesce(F("caudal"), Value(0.0)),
+        (Coalesce(F("minutos_riego"), Value(0.0)) / Value(60.0)) * Coalesce(F("caudal"), Value(0.0)),
         output_field=FloatField(),
     )
 
@@ -1235,7 +1388,7 @@ def riego_export_excel_view(request):
     ws["A2"] = f"Reporte de Riego - Generado: {timezone.localtime().strftime('%d/%m/%Y %H:%M')}"
     ws.merge_cells("A2:F2")
     ws["A3"] = f"Usuario: {current_user.nombre if current_user else '-'}"
-    ws.merge_cells("A3:F3")
+    ws.merge_cells("A3:G3")
 
     ws["A5"] = "Filtros aplicados"
     ws["A5"].font = Font(bold=True)
@@ -1245,11 +1398,11 @@ def riego_export_excel_view(request):
         ws[f"A{filtro_row}"] = label
         ws[f"A{filtro_row}"].font = Font(bold=True)
         ws[f"B{filtro_row}"] = value
-        ws.merge_cells(start_row=filtro_row, start_column=2, end_row=filtro_row, end_column=6)
+        ws.merge_cells(start_row=filtro_row, start_column=2, end_row=filtro_row, end_column=7)
         filtro_row += 1
 
     table_row = filtro_row + 1
-    headers = ["Fecha", "Predio", "Cuartel", "Litros", "Responsable", "Observaciones"]
+    headers = ["Fecha", "Predio", "Cuartel", "Minutos", "Litros", "Responsable", "Observaciones"]
     for idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=table_row, column=idx, value=header)
         cell.font = Font(bold=True, color="FFFFFF")
@@ -1269,12 +1422,14 @@ def riego_export_excel_view(request):
         ws.cell(data_row, 1, riego.fecha_riego.strftime("%d/%m/%Y") if riego.fecha_riego else "-")
         ws.cell(data_row, 2, riego.cuartel.predio.nombre_predio)
         ws.cell(data_row, 3, riego.cuartel.nombre_cuartel)
-        ws.cell(data_row, 4, litros)
-        ws.cell(data_row, 5, riego.cuartel.predio.usuario.nombre)
-        ws.cell(data_row, 6, riego.observaciones or "-")
+        ws.cell(data_row, 4, float(riego.minutos_riego or 0))
+        ws.cell(data_row, 5, litros)
+        ws.cell(data_row, 6, riego.cuartel.predio.usuario.nombre)
+        ws.cell(data_row, 7, riego.observaciones or "-")
 
         ws.cell(data_row, 4).number_format = "#,##0.00"
-        for col in range(1, 7):
+        ws.cell(data_row, 5).number_format = "#,##0.00"
+        for col in range(1, 8):
             ws.cell(data_row, col).border = thin_border
             ws.cell(data_row, col).alignment = Alignment(vertical="top", wrap_text=True)
         data_row += 1
@@ -1294,8 +1449,9 @@ def riego_export_excel_view(request):
         "B": 24,
         "C": 24,
         "D": 14,
-        "E": 24,
-        "F": 42,
+        "E": 14,
+        "F": 24,
+        "G": 42,
     }
     for col, width in column_widths.items():
         ws.column_dimensions[col].width = width
@@ -1603,20 +1759,21 @@ def riego_export_pdf_view(request):
 
     story.append(Paragraph("<b>Detalle de Registros</b>", subtitle_style))
 
-    table_data = [["Fecha", "Predio", "Cuartel", "Litros", "Responsable", "Observaciones"]]
+    table_data = [["Fecha", "Predio", "Cuartel", "Minutos", "Litros", "Responsable", "Observaciones"]]
     for riego in dataset["riegos"]:
         table_data.append(
             [
                 riego.fecha_riego.strftime("%d/%m/%Y") if riego.fecha_riego else "-",
                 riego.cuartel.predio.nombre_predio,
                 riego.cuartel.nombre_cuartel,
+                f"{float(riego.minutos_riego or 0):.2f}",
                 f"{float(getattr(riego, 'litros_estimados', 0) or 0):.2f}",
                 riego.cuartel.predio.usuario.nombre,
                 (riego.observaciones or "-")[:120],
             ]
         )
 
-    col_widths = [22 * mm, 33 * mm, 31 * mm, 18 * mm, 30 * mm, 56 * mm]
+    col_widths = [20 * mm, 30 * mm, 26 * mm, 16 * mm, 16 * mm, 26 * mm, 46 * mm]
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
     table.setStyle(
         TableStyle(
@@ -1660,7 +1817,7 @@ def cuarteles_por_predio_view(request, predio_id):
     return JsonResponse({"success": True, "cuarteles": list(cuarteles)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def riego_create_view(request):
     if request.method != "POST":
         return redirect("riegos_lista")
@@ -1700,13 +1857,13 @@ def riego_detail_view(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
     
     try:
-        riego = Riego.objects.select_related("cuartel", "cuartel__predio").get(pk=pk)
+        riego = Riego.objects.select_related("cuartel", "cuartel__predio", "cuartel__predio__usuario").get(pk=pk)
         return JsonResponse({"success": True, "riego": serialize_riego(riego)})
     except Riego.DoesNotExist:
         return JsonResponse({"success": False, "error": "Riego no encontrado"}, status=404)
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def riego_update_view(request, pk):
     if not user_owns_riego(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -1746,7 +1903,7 @@ def riego_update_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def riego_delete_view(request, pk):
     if not user_owns_riego(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -1780,7 +1937,7 @@ def riego_delete_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def riego_toggle_estado_view(request, pk):
     if not user_owns_riego(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -1848,12 +2005,15 @@ def serialize_fertilizacion(fertilizacion):
         "fecha_aplicacion": fertilizacion.fecha_aplicacion.strftime("%d/%m/%Y") if fertilizacion.fecha_aplicacion else "-",
         "fecha_aplicacion_iso": fertilizacion.fecha_aplicacion.strftime("%Y-%m-%d") if fertilizacion.fecha_aplicacion else "",
         "producto": fertilizacion.producto or "",
+        "producto_label": fertilizacion.get_producto_display() if fertilizacion.producto else "",
         "dosis": str(fertilizacion.dosis) if fertilizacion.dosis is not None else "",
         "unidad": fertilizacion.unidad or "",
         "metodo_aplicacion": fertilizacion.metodo_aplicacion or "",
         "observaciones": fertilizacion.observaciones or "",
         "estado": bool(fertilizacion.estado),
         "created_at": fertilizacion.created_at.strftime("%d/%m/%Y %H:%M") if fertilizacion.created_at else "-",
+        **build_responsable_info(fertilizacion.cuartel.predio.usuario),
+        **build_ubicacion_info(fertilizacion.cuartel.predio, fertilizacion.cuartel.nombre_cuartel),
     }
 
 
@@ -1939,7 +2099,7 @@ def fertilizaciones_list_view(request):
     )
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def fertilizacion_create_view(request):
     if request.method != "POST":
         return redirect("fertilizaciones_lista")
@@ -1978,13 +2138,13 @@ def fertilizacion_detail_view(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
     
     try:
-        fertilizacion = Fertilizacion.objects.select_related("cuartel", "cuartel__predio").get(pk=pk)
+        fertilizacion = Fertilizacion.objects.select_related("cuartel", "cuartel__predio", "cuartel__predio__usuario").get(pk=pk)
         return JsonResponse({"success": True, "fertilizacion": serialize_fertilizacion(fertilizacion)})
     except Fertilizacion.DoesNotExist:
         return JsonResponse({"success": False, "error": "Fertilización no encontrada"}, status=404)
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def fertilizacion_update_view(request, pk):
     if not user_owns_fertilizacion(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2023,7 +2183,7 @@ def fertilizacion_update_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def fertilizacion_delete_view(request, pk):
     if not user_owns_fertilizacion(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2056,7 +2216,7 @@ def fertilizacion_delete_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def fertilizacion_toggle_estado_view(request, pk):
     if not user_owns_fertilizacion(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2133,25 +2293,29 @@ def serialize_cosecha(cosecha):
         "estado": bool(cosecha.estado),
         "estado_label": "Activa" if cosecha.estado else "Inactiva",
         "created_at": cosecha.created_at.strftime("%d/%m/%Y %H:%M") if cosecha.created_at else "-",
+        **build_responsable_info(cosecha.cuartel.predio.usuario),
+        **build_ubicacion_info(cosecha.cuartel.predio, cosecha.cuartel.nombre_cuartel),
     }
 
+
+_DECIMAL_ZERO = Value(Decimal("0.00"), output_field=DecimalField())
 
 def build_cosecha_analytics(queryset):
     produccion_cuartel = list(
         queryset.values("cuartel__nombre_cuartel", "cuartel__predio__nombre_predio")
-        .annotate(total_kg=Coalesce(Sum("cantidad_kg"), Value(0.0)))
+        .annotate(total_kg=Coalesce(Sum("cantidad_kg"), _DECIMAL_ZERO))
         .order_by("-total_kg", "cuartel__nombre_cuartel")[:10]
     )
 
     produccion_variedad = list(
         queryset.values("cuartel__variedad")
-        .annotate(total_kg=Coalesce(Sum("cantidad_kg"), Value(0.0)))
+        .annotate(total_kg=Coalesce(Sum("cantidad_kg"), _DECIMAL_ZERO))
         .order_by("-total_kg", "cuartel__variedad")[:10]
     )
 
     rendimiento = list(
         queryset.values("cuartel__nombre_cuartel", "cuartel__predio__nombre_predio")
-        .annotate(total_kg=Coalesce(Sum("cantidad_kg"), Value(0.0)), total_bins=Coalesce(Sum("cantidad_bins"), Value(0.0)))
+        .annotate(total_kg=Coalesce(Sum("cantidad_kg"), _DECIMAL_ZERO), total_bins=Coalesce(Sum("cantidad_bins"), _DECIMAL_ZERO))
         .order_by("-total_kg", "-total_bins")[:10]
     )
 
@@ -2159,7 +2323,7 @@ def build_cosecha_analytics(queryset):
         queryset,
         date_field="fecha_cosecha",
         aggregate_name="KG",
-        aggregate_expression=Coalesce(Sum("cantidad_kg"), Value(0.0)),
+        aggregate_expression=Coalesce(Sum("cantidad_kg"), _DECIMAL_ZERO),
         months=12,
     )
 
@@ -2231,7 +2395,7 @@ def cosechas_list_view(request):
     )
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cosecha_create_view(request):
     if request.method != "POST":
         return redirect("cosechas_lista")
@@ -2270,13 +2434,13 @@ def cosecha_detail_view(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
     
     try:
-        cosecha = Cosecha.objects.select_related("cuartel", "cuartel__predio").get(pk=pk)
+        cosecha = Cosecha.objects.select_related("cuartel", "cuartel__predio", "cuartel__predio__usuario").get(pk=pk)
         return JsonResponse({"success": True, "cosecha": serialize_cosecha(cosecha)})
     except Cosecha.DoesNotExist:
         return JsonResponse({"success": False, "error": "Cosecha no encontrada"}, status=404)
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cosecha_update_view(request, pk):
     if not user_owns_cosecha(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2315,7 +2479,7 @@ def cosecha_update_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cosecha_delete_view(request, pk):
     if not user_owns_cosecha(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2348,7 +2512,7 @@ def cosecha_delete_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def cosecha_toggle_estado_view(request, pk):
     if not user_owns_cosecha(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2423,6 +2587,8 @@ def serialize_aplicacion_quimica(aplicacion):
         "observaciones": aplicacion.observaciones or "",
         "estado": bool(aplicacion.estado),
         "created_at": aplicacion.created_at.strftime("%d/%m/%Y %H:%M") if aplicacion.created_at else "-",
+        **build_responsable_info(aplicacion.cuartel.predio.usuario),
+        **build_ubicacion_info(aplicacion.cuartel.predio, aplicacion.cuartel.nombre_cuartel),
     }
 
 
@@ -2508,7 +2674,7 @@ def aplicaciones_quimicas_list_view(request):
     )
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def aplicacion_quimica_create_view(request):
     if request.method != "POST":
         return redirect("aplicaciones_quimicas_lista")
@@ -2547,13 +2713,13 @@ def aplicacion_quimica_detail_view(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
     
     try:
-        aplicacion = AplicacionQuimica.objects.select_related("cuartel", "cuartel__predio").get(pk=pk)
+        aplicacion = AplicacionQuimica.objects.select_related("cuartel", "cuartel__predio", "cuartel__predio__usuario").get(pk=pk)
         return JsonResponse({"success": True, "aplicacion": serialize_aplicacion_quimica(aplicacion)})
     except AplicacionQuimica.DoesNotExist:
         return JsonResponse({"success": False, "error": "Aplicación química no encontrada"}, status=404)
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def aplicacion_quimica_update_view(request, pk):
     if not user_owns_aplicacion_quimica(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2592,7 +2758,7 @@ def aplicacion_quimica_update_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def aplicacion_quimica_delete_view(request, pk):
     if not user_owns_aplicacion_quimica(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2625,7 +2791,7 @@ def aplicacion_quimica_delete_view(request, pk):
         return JsonResponse({"success": False, "error": str(e)})
 
 
-@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
 def aplicacion_quimica_toggle_estado_view(request, pk):
     if not user_owns_aplicacion_quimica(request, pk):
         return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
@@ -2656,3 +2822,577 @@ def aplicacion_quimica_toggle_estado_view(request, pk):
         )
     except AplicacionQuimica.DoesNotExist:
         return JsonResponse({"success": False, "error": "Aplicación química no encontrada"}, status=404)
+
+
+# ---------------------------------------------------------------------------
+# LABORES AGRICOLAS
+# ---------------------------------------------------------------------------
+
+def serialize_labor_agricola(labor):
+    return {
+        "id": labor.id,
+        "usuario_id": labor.usuario_id,
+        "usuario_nombre": labor.usuario.nombre if labor.usuario_id else "-",
+        "predio_id": labor.predio_id,
+        "predio_nombre": labor.predio.nombre_predio,
+        "cuartel_id": labor.cuartel_id,
+        "cuartel_nombre": labor.cuartel.nombre_cuartel,
+        "fecha": labor.fecha.strftime("%d/%m/%Y") if labor.fecha else "-",
+        "fecha_iso": labor.fecha.strftime("%Y-%m-%d") if labor.fecha else "",
+        "tipo_labor": labor.tipo_labor or "",
+        "tipo_labor_label": labor.get_tipo_labor_display() if labor.tipo_labor else "",
+        "subtipo": labor.subtipo or "",
+        "responsable": labor.responsable or "",
+        "descripcion": labor.descripcion or "",
+        "observaciones": labor.observaciones or "",
+        "estado": bool(labor.estado),
+        "created_at": labor.created_at.strftime("%d/%m/%Y %H:%M") if labor.created_at else "-",
+        **build_responsable_info(labor.usuario if labor.usuario_id else labor.predio.usuario),
+        **build_ubicacion_info(labor.predio, labor.cuartel.nombre_cuartel if labor.cuartel_id else ""),
+    }
+
+
+def build_labores_resumen(queryset=None):
+    qs = queryset if queryset is not None else LaborAgricola.objects.all()
+    total_labores = qs.count()
+    cuarteles_intervenidos = qs.values("cuartel_id").distinct().count()
+    responsables = qs.exclude(responsable__isnull=True).exclude(responsable__exact="").values("responsable").distinct().count()
+    ultima_labor_obj = qs.select_related("cuartel").order_by("-fecha", "-id").first()
+    ultima_labor = (
+        f"{ultima_labor_obj.cuartel.nombre_cuartel} - {ultima_labor_obj.fecha.strftime('%d/%m/%Y')}"
+        if ultima_labor_obj
+        else "-"
+    )
+    return {
+        "total_labores": total_labores,
+        "cuarteles_intervenidos": cuarteles_intervenidos,
+        "responsables_activos": responsables,
+        "ultima_labor": ultima_labor,
+    }
+
+
+def build_labores_analytics(queryset):
+    frecuencia_tipos = list(
+        queryset.values("tipo_labor")
+        .annotate(total=Count("id"))
+        .order_by("-total", "tipo_labor")
+    )
+    por_cuartel = list(
+        queryset.values("cuartel__nombre_cuartel", "cuartel__predio__nombre_predio")
+        .annotate(total=Count("id"))
+        .order_by("-total", "cuartel__nombre_cuartel")[:10]
+    )
+    por_temporada = list(
+        queryset.annotate(periodo=TruncMonth("fecha"))
+        .values("periodo")
+        .annotate(total=Count("id"))
+        .order_by("periodo")
+    )
+
+    return {
+        "frecuencia_labores": {
+            "labels": [item["tipo_labor"].replace("_", " ").title() for item in frecuencia_tipos],
+            "series": [item["total"] for item in frecuencia_tipos],
+        },
+        "labores_por_cuartel": {
+            "labels": [f"{item['cuartel__nombre_cuartel']} ({item['cuartel__predio__nombre_predio']})" for item in por_cuartel],
+            "series": [item["total"] for item in por_cuartel],
+        },
+        "labores_por_temporada": {
+            "labels": [item["periodo"].strftime("%m/%Y") if item["periodo"] else "-" for item in por_temporada],
+            "series": [item["total"] for item in por_temporada],
+        },
+    }
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def labores_agricolas_list_view(request):
+    current_user = get_current_user(request)
+    q = request.GET.get("q", "").strip()
+    labores = get_filtered_labores_agricolas(request, q)
+    predios_activos = get_filtered_predios(request).filter(estado=True).order_by("nombre_predio")
+    cuarteles_activos = get_filtered_cuarteles(request).filter(estado=True, predio__estado=True).order_by("nombre_cuartel")
+
+    return render(
+        request,
+        "labores_agricolas_lista.html",
+        {
+            "labores": labores,
+            "predios_activos": predios_activos,
+            "cuarteles_activos": cuarteles_activos,
+            "current_user": current_user,
+            "resumen": build_labores_resumen(labores),
+            "q": q,
+            "sidebar_context": get_sidebar_context(request),
+            "can_manage": can_manage_labores_agricolas(request),
+        },
+    )
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def labores_agricolas_analitica_view(request):
+    current_user = get_current_user(request)
+    labores = get_filtered_labores_agricolas(request)
+    predios_activos = get_filtered_predios(request).filter(estado=True).order_by("nombre_predio")
+    cuarteles_activos = get_filtered_cuarteles(request).filter(estado=True, predio__estado=True).order_by("nombre_cuartel")
+
+    return render(
+        request,
+        "labores_agricolas_lista.html",
+        {
+            "labores": labores,
+            "predios_activos": predios_activos,
+            "cuarteles_activos": cuarteles_activos,
+            "current_user": current_user,
+            "analytics": build_labores_analytics(labores),
+            "q": "",
+            "sidebar_context": get_sidebar_context(request),
+            "can_manage": can_manage_labores_agricolas(request),
+        },
+    )
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def labores_agricolas_analytics_api(request):
+    filters = get_dashboard_filters(request)
+    qs = get_filtered_labores_agricolas(request)
+
+    predio_id = filters.get("predio_id")
+    cuartel_id = filters.get("cuartel_id")
+    fecha_desde = filters.get("fecha_desde")
+    fecha_hasta = filters.get("fecha_hasta")
+
+    if predio_id:
+        qs = qs.filter(predio_id=predio_id)
+    if cuartel_id:
+        qs = qs.filter(cuartel_id=cuartel_id)
+    if fecha_desde:
+        qs = qs.filter(fecha__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha__lte=fecha_hasta)
+
+    return JsonResponse(
+        {
+            "success": True,
+            "resumen": build_labores_resumen(qs),
+            "analytics": build_labores_analytics(qs),
+        }
+    )
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
+def labor_agricola_create_view(request):
+    if request.method != "POST":
+        return redirect("labores_agricolas_lista")
+
+    denied_response = deny_if_cannot_manage(
+        request,
+        can_manage_labores_agricolas(request),
+        "No tienes permisos para crear labores agrícolas.",
+    )
+    if denied_response:
+        return denied_response
+
+    try:
+        form = LaborAgricolaCreateForm(normalize_estado_post_data(request), request=request)
+        if form.is_valid():
+            labor = form.save(commit=False)
+            labor.usuario_id = request.session.get("usuario_id")
+            labor.save()
+            labor.refresh_from_db()
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": "Labor agrícola creada correctamente.",
+                    "labor": serialize_labor_agricola(labor),
+                    "resumen": build_labores_resumen(get_filtered_labores_agricolas(request)),
+                }
+            )
+
+        errors = {field: error[0] for field, error in form.errors.items()}
+        return JsonResponse({"success": False, "error": "Validación fallida", "errors": errors})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def labor_agricola_detail_view(request, pk):
+    if not user_owns_labor_agricola(request, pk):
+        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+
+    try:
+        labor = LaborAgricola.objects.select_related("usuario", "predio", "predio__usuario", "cuartel").get(pk=pk)
+        return JsonResponse({"success": True, "labor": serialize_labor_agricola(labor)})
+    except LaborAgricola.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Labor agrícola no encontrada"}, status=404)
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
+def labor_agricola_update_view(request, pk):
+    if request.method != "POST":
+        return redirect("labores_agricolas_lista")
+
+    if not user_owns_labor_agricola(request, pk):
+        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+
+    denied_response = deny_if_cannot_manage(
+        request,
+        can_manage_labores_agricolas(request),
+        "No tienes permisos para editar labores agrícolas.",
+    )
+    if denied_response:
+        return denied_response
+
+    try:
+        labor = LaborAgricola.objects.get(pk=pk)
+        form = LaborAgricolaUpdateForm(normalize_estado_post_data(request), instance=labor, request=request)
+        if form.is_valid():
+            labor = form.save()
+            labor.refresh_from_db()
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": "Labor agrícola actualizada correctamente.",
+                    "labor": serialize_labor_agricola(labor),
+                    "resumen": build_labores_resumen(get_filtered_labores_agricolas(request)),
+                }
+            )
+
+        errors = {field: error[0] for field, error in form.errors.items()}
+        return JsonResponse({"success": False, "error": "Validación fallida", "errors": errors})
+    except LaborAgricola.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Labor agrícola no encontrada"}, status=404)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
+def labor_agricola_delete_view(request, pk):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    if not user_owns_labor_agricola(request, pk):
+        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+
+    denied_response = deny_if_cannot_manage(
+        request,
+        can_manage_labores_agricolas(request),
+        "No tienes permisos para eliminar labores agrícolas.",
+    )
+    if denied_response:
+        return denied_response
+
+    try:
+        labor = LaborAgricola.objects.select_related("cuartel").get(pk=pk)
+        nombre_cuartel = labor.cuartel.nombre_cuartel
+        labor.delete()
+        return JsonResponse(
+            {
+                "success": True,
+                "message": f"Labor agrícola del cuartel {nombre_cuartel} eliminada correctamente.",
+                "resumen": build_labores_resumen(get_filtered_labores_agricolas(request)),
+            }
+        )
+    except LaborAgricola.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Labor agrícola no encontrada"}, status=404)
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_PRODUCTOR)
+def labor_agricola_toggle_estado_view(request, pk):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    if not user_owns_labor_agricola(request, pk):
+        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+
+    try:
+        labor = LaborAgricola.objects.get(pk=pk)
+        labor.estado = not bool(labor.estado)
+        labor.save(update_fields=["estado"])
+        estado_txt = "activada" if labor.estado else "desactivada"
+        return JsonResponse(
+            {
+                "success": True,
+                "message": f"Labor agrícola {labor.id} {estado_txt} correctamente.",
+                "estado": bool(labor.estado),
+                "resumen": build_labores_resumen(get_filtered_labores_agricolas(request)),
+            }
+        )
+    except LaborAgricola.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Labor agrícola no encontrada"}, status=404)
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def labores_agricolas_export_excel_view(request):
+    if find_spec("openpyxl") is None:
+        return build_export_dependency_error_response(request, ["openpyxl"])
+
+    from openpyxl import Workbook
+
+    labores = get_filtered_labores_agricolas(request)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Labores"
+    ws.append(["Fecha", "Predio", "Cuartel", "Tipo", "Subtipo", "Responsable", "Descripción", "Observaciones", "Estado"])
+
+    for labor in labores:
+        ws.append([
+            labor.fecha.strftime("%d/%m/%Y") if labor.fecha else "-",
+            labor.predio.nombre_predio,
+            labor.cuartel.nombre_cuartel,
+            labor.get_tipo_labor_display(),
+            labor.subtipo or "-",
+            labor.responsable or "-",
+            labor.descripcion or "-",
+            labor.observaciones or "-",
+            "Activo" if labor.estado else "Inactivo",
+        ])
+
+    filename = f"labores_agricolas_{timezone.localtime().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def labores_agricolas_export_pdf_view(request):
+    if find_spec("reportlab") is None:
+        return build_export_dependency_error_response(request, ["reportlab"])
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    labores = get_filtered_labores_agricolas(request)
+    filename = f"labores_agricolas_{timezone.localtime().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    c = canvas.Canvas(response, pagesize=A4)
+    width, height = A4
+    y = height - 40
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(30, y, "Reporte de Labores Agricolas")
+    y -= 24
+    c.setFont("Helvetica", 8)
+
+    for labor in labores:
+        line = (
+            f"{labor.fecha.strftime('%d/%m/%Y')} | {labor.predio.nombre_predio} | {labor.cuartel.nombre_cuartel} | "
+            f"{labor.get_tipo_labor_display()} | {labor.subtipo or '-'} | {labor.responsable or '-'}"
+        )
+        c.drawString(30, y, line[:150])
+        y -= 14
+        if y < 40:
+            c.showPage()
+            y = height - 40
+            c.setFont("Helvetica", 8)
+
+    c.save()
+    return response
+
+
+# ---------------------------------------------------------------------------
+# COMENTARIOS TECNICOS (PRODESAL)
+# ---------------------------------------------------------------------------
+
+MODULO_DETAIL_ROUTE = {
+    "predio": "predios_detalle",
+    "cuartel": "cuarteles_detalle",
+    "riego": "riegos_detalle",
+    "fertilizacion": "fertilizaciones_detalle",
+    "cosecha": "cosechas_detalle",
+    "aplicacion_quimica": "aplicaciones_quimicas_detalle",
+    "labor_agricola": "labores_agricolas_detalle",
+}
+
+
+def serialize_comentario(comentario):
+    return {
+        "id": comentario.id,
+        "usuario_prodesal": comentario.usuario_prodesal.nombre,
+        "modulo": comentario.modulo,
+        "modulo_label": comentario.get_modulo_display(),
+        "objeto_id": comentario.objeto_id,
+        "comentario": comentario.comentario,
+        "leido": comentario.leido,
+        "fecha": comentario.fecha.strftime("%d/%m/%Y %H:%M") if comentario.fecha else "-",
+    }
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO, Usuario.ROL_PRODUCTOR)
+def comentarios_por_registro_view(request, modulo, objeto_id):
+    if modulo not in MODULO_DETAIL_ROUTE:
+        return JsonResponse({"success": False, "error": "Módulo no válido"}, status=400)
+
+    if not user_can_view_registro(request, modulo, objeto_id):
+        return access_denied_response(request, "No autorizado para consultar este registro.")
+
+    comentarios = ComentarioTecnico.objects.select_related("usuario_prodesal").filter(
+        modulo=modulo, objeto_id=objeto_id
+    )
+
+    current_user = get_current_user(request)
+    if current_user and current_user.rol == Usuario.ROL_PRODUCTOR:
+        ComentarioTecnico.objects.filter(modulo=modulo, objeto_id=objeto_id, productor=current_user, leido=False).update(
+            leido=True
+        )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "comentarios": [serialize_comentario(c) for c in comentarios],
+        }
+    )
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO)
+def comentario_create_view(request, modulo, objeto_id):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    if not can_comment(request):
+        return access_denied_response(request, "No tienes permisos para dejar observaciones.")
+
+    if modulo not in MODULO_DETAIL_ROUTE:
+        return JsonResponse({"success": False, "error": "Módulo no válido"}, status=400)
+
+    registro, productor_id = get_registro_y_productor(modulo, objeto_id)
+    if registro is None or not productor_id:
+        return JsonResponse({"success": False, "error": "Registro no encontrado"}, status=404)
+
+    current_user = get_current_user(request)
+    form = ComentarioTecnicoForm(request.POST)
+    if form.is_valid():
+        comentario = form.save(commit=False)
+        comentario.usuario_prodesal = current_user
+        comentario.productor_id = productor_id
+        comentario.modulo = modulo
+        comentario.objeto_id = objeto_id
+        comentario.save()
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Observación registrada correctamente.",
+                "comentario": serialize_comentario(comentario),
+            }
+        )
+
+    errors = {field: error[0] for field, error in form.errors.items()}
+    return JsonResponse({"success": False, "error": "Validación fallida", "errors": errors})
+
+
+# ---------------------------------------------------------------------------
+# NOTIFICACIONES
+# ---------------------------------------------------------------------------
+
+def serialize_notificacion(notificacion):
+    return {
+        "id": notificacion.id,
+        "titulo": notificacion.titulo,
+        "mensaje": notificacion.mensaje,
+        "usuario_generador": notificacion.usuario_generador.nombre,
+        "usuario_generador_rol": ROL_LABELS.get(notificacion.usuario_generador.rol, notificacion.usuario_generador.rol),
+        "productor": notificacion.productor.nombre,
+        "modulo": notificacion.modulo or "",
+        "modulo_label": notificacion.get_modulo_display() if notificacion.modulo else "",
+        "objeto_id": notificacion.objeto_id,
+        "leido": notificacion.leido,
+        "fecha": notificacion.fecha.strftime("%d/%m/%Y") if notificacion.fecha else "-",
+        "hora": notificacion.fecha.strftime("%H:%M") if notificacion.fecha else "-",
+        "fecha_hora": notificacion.fecha.strftime("%d/%m/%Y %H:%M") if notificacion.fecha else "-",
+    }
+
+
+@role_required(Usuario.ROL_ADMIN, Usuario.ROL_TECNICO)
+def notificacion_create_view(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    if not can_send_notifications(request):
+        return access_denied_response(request, "No tienes permisos para enviar notificaciones.")
+
+    modulo = request.POST.get("modulo", "").strip()
+    objeto_id = request.POST.get("objeto_id", "").strip()
+    productor = None
+
+    if modulo and objeto_id:
+        registro, productor_id_resuelto = get_registro_y_productor(modulo, objeto_id)
+        if registro is None or not productor_id_resuelto:
+            return JsonResponse({"success": False, "error": "Registro no encontrado"}, status=404)
+        productor = Usuario.objects.filter(id=productor_id_resuelto, rol=Usuario.ROL_PRODUCTOR, estado=True).first()
+    else:
+        modulo = None
+        objeto_id = None
+        productor_id = request.POST.get("productor_id")
+        productor = Usuario.objects.filter(id=productor_id, rol=Usuario.ROL_PRODUCTOR, estado=True).first()
+
+    if not productor:
+        return JsonResponse({"success": False, "error": "Productor no válido"}, status=400)
+
+    current_user = get_current_user(request)
+    form = NotificacionForm(request.POST)
+    if form.is_valid():
+        notificacion = form.save(commit=False)
+        notificacion.usuario_generador = current_user
+        notificacion.productor = productor
+        notificacion.modulo = modulo
+        notificacion.objeto_id = objeto_id or None
+        notificacion.save()
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Notificación enviada correctamente.",
+                "notificacion": serialize_notificacion(notificacion),
+            }
+        )
+
+    errors = {field: error[0] for field, error in form.errors.items()}
+    return JsonResponse({"success": False, "error": "Validación fallida", "errors": errors})
+
+
+@login_required_custom
+def notificaciones_list_view(request):
+    current_user = get_current_user(request)
+    if not current_user:
+        return JsonResponse({"success": False, "error": "Sesión inválida"}, status=401)
+
+    if current_user.rol == Usuario.ROL_PRODUCTOR:
+        notificaciones = Notificacion.objects.select_related("usuario_generador").filter(productor=current_user)
+    elif current_user.rol == Usuario.ROL_TECNICO:
+        notificaciones = Notificacion.objects.select_related("usuario_generador", "productor").filter(
+            usuario_generador=current_user
+        )
+    else:
+        notificaciones = Notificacion.objects.select_related("usuario_generador", "productor").all()
+
+    return JsonResponse(
+        {
+            "success": True,
+            "notificaciones": [serialize_notificacion(n) for n in notificaciones[:50]],
+            "no_leidas": notificaciones.filter(leido=False).count() if current_user.rol == Usuario.ROL_PRODUCTOR else 0,
+        }
+    )
+
+
+@login_required_custom
+def notificacion_marcar_leida_view(request, pk):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+
+    current_user = get_current_user(request)
+    if not current_user:
+        return JsonResponse({"success": False, "error": "Sesión inválida"}, status=401)
+
+    try:
+        notificacion = Notificacion.objects.get(pk=pk, productor=current_user)
+    except Notificacion.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Notificación no encontrada"}, status=404)
+
+    notificacion.leido = True
+    notificacion.save(update_fields=["leido"])
+    return JsonResponse({"success": True})
+

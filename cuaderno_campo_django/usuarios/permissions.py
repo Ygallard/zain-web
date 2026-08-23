@@ -5,7 +5,7 @@ Define lógica de control de acceso y filtrado automático de ORM.
 
 from django.db.models import Q
 
-from .models import Usuario, Predio, Cuartel, Riego, Fertilizacion, Cosecha, AplicacionQuimica
+from .models import Usuario, Predio, Cuartel, Riego, Fertilizacion, Cosecha, AplicacionQuimica, LaborAgricola
 
 
 # ============================================================================
@@ -21,28 +21,34 @@ ROLE_PERMISSIONS = {
         "can_manage_fertilizaciones": True,
         "can_manage_cosechas": True,
         "can_manage_aplicaciones_quimicas": True,
+        "can_manage_labores_agricolas": True,
         "can_manage_auditoria": True,
         "can_view_all_data": True,
     },
     Usuario.ROL_TECNICO: {
+        # PRODESAL: supervision y apoyo tecnico. Solo lectura + comentarios + notificaciones.
         "can_manage_usuarios": False,
         "can_manage_predios": False,
-        "can_manage_cuarteles": False,
-        "can_manage_riegos": True,
-        "can_manage_fertilizaciones": True,
-        "can_manage_cosechas": True,
-        "can_manage_aplicaciones_quimicas": True,
-        "can_manage_auditoria": False,
-        "can_view_all_data": True,
-    },
-    Usuario.ROL_PRODUCTOR: {
-        "can_manage_usuarios": False,
-        "can_manage_predios": True,
         "can_manage_cuarteles": False,
         "can_manage_riegos": False,
         "can_manage_fertilizaciones": False,
         "can_manage_cosechas": False,
         "can_manage_aplicaciones_quimicas": False,
+        "can_manage_labores_agricolas": False,
+        "can_manage_auditoria": False,
+        "can_view_all_data": True,
+        "can_comment": True,
+        "can_send_notifications": True,
+    },
+    Usuario.ROL_PRODUCTOR: {
+        "can_manage_usuarios": False,
+        "can_manage_predios": True,
+        "can_manage_cuarteles": True,
+        "can_manage_riegos": True,
+        "can_manage_fertilizaciones": True,
+        "can_manage_cosechas": True,
+        "can_manage_aplicaciones_quimicas": True,
+        "can_manage_labores_agricolas": True,
         "can_manage_auditoria": False,
         "can_view_all_data": False,  # Solo sus propios datos
     },
@@ -58,13 +64,18 @@ SIDEBAR_ITEMS = {
         "fertilizaciones_lista",
         "cosechas_lista",
         "aplicaciones_quimicas_lista",
+        "labores_agricolas_lista",
         "auditoria_logs",
     ],
     Usuario.ROL_TECNICO: [
+        "productores_lista",
+        "predios_lista",
+        "cuarteles_lista",
         "riegos_lista",
         "fertilizaciones_lista",
         "cosechas_lista",
         "aplicaciones_quimicas_lista",
+        "labores_agricolas_lista",
     ],
     Usuario.ROL_PRODUCTOR: [
         "predios_lista",
@@ -73,6 +84,7 @@ SIDEBAR_ITEMS = {
         "fertilizaciones_lista",
         "cosechas_lista",
         "aplicaciones_quimicas_lista",
+        "labores_agricolas_lista",
     ],
 }
 
@@ -126,6 +138,11 @@ def can_manage_aplicaciones_quimicas(request):
     return has_permission(request, "can_manage_aplicaciones_quimicas")
 
 
+def can_manage_labores_agricolas(request):
+    """¿Puede gestionar labores agrícolas?"""
+    return has_permission(request, "can_manage_labores_agricolas")
+
+
 def can_view_all_data(request):
     """¿Puede ver todos los datos o solo los suyos?"""
     return has_permission(request, "can_view_all_data")
@@ -134,6 +151,16 @@ def can_view_all_data(request):
 def can_manage_auditoria(request):
     """¿Puede visualizar la auditoria del sistema?"""
     return has_permission(request, "can_manage_auditoria")
+
+
+def can_comment(request):
+    """¿Puede dejar observaciones tecnicas sobre registros?"""
+    return has_permission(request, "can_comment")
+
+
+def can_send_notifications(request):
+    """¿Puede enviar notificaciones a productores?"""
+    return has_permission(request, "can_send_notifications")
 
 
 # ============================================================================
@@ -294,6 +321,37 @@ def get_filtered_aplicaciones_quimicas(request, q=""):
     return queryset
 
 
+def get_filtered_labores_agricolas(request, q=""):
+    """
+    Retorna QuerySet de labores agrícolas filtrado según rol.
+    - ADMIN: todas
+    - TECNICO: todas
+    - PRODUCTOR: solo sus labores (a través de sus cuarteles)
+    """
+    rol = request.session.get("rol")
+    user_id = request.session.get("usuario_id")
+
+    queryset = LaborAgricola.objects.select_related(
+        "usuario", "predio", "cuartel", "cuartel__predio", "cuartel__predio__usuario"
+    ).all()
+
+    if rol == Usuario.ROL_PRODUCTOR and user_id:
+        queryset = queryset.filter(cuartel__predio__usuario_id=user_id)
+
+    if q:
+        queryset = queryset.filter(
+            Q(predio__nombre_predio__icontains=q)
+            | Q(cuartel__nombre_cuartel__icontains=q)
+            | Q(tipo_labor__icontains=q)
+            | Q(subtipo__icontains=q)
+            | Q(responsable__icontains=q)
+            | Q(descripcion__icontains=q)
+            | Q(observaciones__icontains=q)
+        )
+
+    return queryset
+
+
 # ============================================================================
 # FUNCIONES DE VALIDACIÓN DE PROPIEDAD DE DATOS
 # ============================================================================
@@ -424,6 +482,82 @@ def user_owns_aplicacion_quimica(request, aplicacion_id):
     return True
 
 
+def user_owns_labor_agricola(request, labor_id):
+    """Valida que el usuario sea propietario de la labor agrícola."""
+    rol = request.session.get("rol")
+    user_id = request.session.get("usuario_id")
+
+    if rol == Usuario.ROL_ADMIN:
+        return True
+
+    if rol == Usuario.ROL_PRODUCTOR:
+        try:
+            LaborAgricola.objects.get(id=labor_id, cuartel__predio__usuario_id=user_id)
+            return True
+        except LaborAgricola.DoesNotExist:
+            return False
+
+    return True
+
+
+# ============================================================================
+# COMENTARIOS / OBSERVACIONES TECNICAS (PRODESAL)
+# ============================================================================
+
+# Mapa de modulo -> (modelo, campo de relacion hasta el usuario/productor propietario)
+MODULO_OWNER_LOOKUP = {
+    "predio": (Predio, "usuario_id"),
+    "cuartel": (Cuartel, "predio__usuario_id"),
+    "riego": (Riego, "cuartel__predio__usuario_id"),
+    "fertilizacion": (Fertilizacion, "cuartel__predio__usuario_id"),
+    "cosecha": (Cosecha, "cuartel__predio__usuario_id"),
+    "aplicacion_quimica": (AplicacionQuimica, "cuartel__predio__usuario_id"),
+    "labor_agricola": (LaborAgricola, "cuartel__predio__usuario_id"),
+}
+
+
+def get_registro_y_productor(modulo, objeto_id):
+    """
+    Resuelve el registro y el id del productor propietario para un modulo/objeto_id dado.
+    Retorna (registro, productor_id) o (None, None) si no existe.
+    """
+    lookup = MODULO_OWNER_LOOKUP.get(modulo)
+    if not lookup:
+        return None, None
+
+    model_class, owner_field = lookup
+    try:
+        registro = model_class.objects.get(id=objeto_id)
+    except model_class.DoesNotExist:
+        return None, None
+
+    productor_id = registro
+    for attr in owner_field.split("__"):
+        if productor_id is None:
+            break
+        productor_id = getattr(productor_id, attr, None)
+
+    return registro, productor_id
+
+
+def user_can_view_registro(request, modulo, objeto_id):
+    """Valida que el usuario actual tenga permiso para consultar el registro (misma regla que las listas filtradas)."""
+    rol = request.session.get("rol")
+    user_id = request.session.get("usuario_id")
+
+    registro, productor_id = get_registro_y_productor(modulo, objeto_id)
+    if registro is None:
+        return False
+
+    if rol in {Usuario.ROL_ADMIN, Usuario.ROL_TECNICO}:
+        return True
+
+    if rol == Usuario.ROL_PRODUCTOR:
+        return productor_id == user_id
+
+    return False
+
+
 # ============================================================================
 # CONTEXTO PARA TEMPLATES
 # ============================================================================
@@ -432,7 +566,14 @@ def get_sidebar_context(request):
     """Retorna contexto para renderizar sidebar dinámico según rol."""
     rol = request.session.get("rol")
     available_items = SIDEBAR_ITEMS.get(rol, [])
-    
+
+    user_id = request.session.get("usuario_id")
+    notificaciones_no_leidas = 0
+    if rol == Usuario.ROL_PRODUCTOR and user_id:
+        from .models import Notificacion
+
+        notificaciones_no_leidas = Notificacion.objects.filter(productor_id=user_id, leido=False).count()
+
     return {
         "rol": rol,
         "sidebar_items": available_items,
@@ -443,5 +584,9 @@ def get_sidebar_context(request):
         "can_manage_fertilizaciones": can_manage_fertilizaciones(request),
         "can_manage_cosechas": can_manage_cosechas(request),
         "can_manage_aplicaciones_quimicas": can_manage_aplicaciones_quimicas(request),
+        "can_manage_labores_agricolas": can_manage_labores_agricolas(request),
         "can_manage_auditoria": can_manage_auditoria(request),
+        "can_comment": can_comment(request),
+        "can_send_notifications": can_send_notifications(request),
+        "notificaciones_no_leidas": notificaciones_no_leidas,
     }

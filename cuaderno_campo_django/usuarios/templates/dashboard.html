@@ -238,6 +238,82 @@
 
 </div>
 
+{% elif current_user.rol == 'tecnico' %}
+
+<!-- DASHBOARD PRODESAL: SUPERVISIÓN Y APOYO TÉCNICO -->
+<div class="dashboard-grid">
+
+    <div class="stat-card sc-blue">
+        <div class="stat-icon si-blue"><i class="bi bi-people-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ productores_supervisados|default:"0" }}</h3>
+            <p>Productores Supervisados</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-green">
+        <div class="stat-icon si-green"><i class="bi bi-map-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ predios_count|default:"0" }}</h3>
+            <p>Predios</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-teal">
+        <div class="stat-icon si-teal"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ cuarteles_count|default:"0" }}</h3>
+            <p>Cuarteles</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-orange">
+        <div class="stat-icon si-orange"><i class="bi bi-flower1"></i></div>
+        <div class="stat-content">
+            <h3>{{ total_cosechas|default:"0" }}</h3>
+            <p>Cosechas Registradas</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-cyan">
+        <div class="stat-icon si-cyan"><i class="bi bi-droplet-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ riegos_recientes|default:"0" }}</h3>
+            <p>Riegos (últimos 7 días)</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-purple">
+        <div class="stat-icon si-purple"><i class="bi bi-flower2"></i></div>
+        <div class="stat-content">
+            <h3>{{ fertilizaciones_recientes|default:"0" }}</h3>
+            <p>Fertilizaciones (últimos 7 días)</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-red">
+        <div class="stat-icon si-red"><i class="bi bi-bezier2"></i></div>
+        <div class="stat-content">
+            <h3>{{ aplicaciones_recientes|default:"0" }}</h3>
+            <p>Aplicaciones (últimos 7 días)</p>
+        </div>
+    </div>
+
+    <div class="stat-card sc-indigo">
+        <div class="stat-icon si-indigo"><i class="bi bi-chat-left-text-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ observaciones_realizadas|default:"0" }}</h3>
+            <p>Observaciones Registradas</p>
+        </div>
+    </div>
+
+</div>
+
+<div class="card">
+    <h3><i class="bi bi-bell-fill"></i> Notificaciones enviadas pendientes de lectura</h3>
+    <p>{{ notificaciones_enviadas_pendientes|default:"0" }} notificación(es) aún no leídas por los productores.</p>
+</div>
+
 {% else %}
 
 <!-- DASHBOARD PARA NO-ADMIN -->
@@ -256,7 +332,7 @@
             <td><strong>Rol:</strong></td>
             <td>
                 {% if current_user.rol == 'tecnico' %}
-                    <span class="badge badge-primary">Técnico</span>
+                    <span class="badge badge-primary">PRODESAL</span>
                 {% else %}
                     <span class="badge badge-info">Productor</span>
                 {% endif %}
@@ -273,11 +349,49 @@
     </table>
 </div>
 
-<div class="card">
-    <h3>
-        <i class="bi bi-construction"></i> En Construcción
-    </h3>
-    <p>Los módulos adicionales estarán disponibles próximamente para usuarios con rol de Técnico o Productor.</p>
+<div class="dashboard-grid">
+    <div class="stat-card sc-blue">
+        <div class="stat-icon si-blue"><i class="bi bi-map-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ total_predios|default:"0" }}</h3>
+            <p>Mis Predios</p>
+        </div>
+    </div>
+    <div class="stat-card sc-teal">
+        <div class="stat-icon si-teal"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ total_cuarteles|default:"0" }}</h3>
+            <p>Mis Cuarteles</p>
+        </div>
+    </div>
+    <div class="stat-card sc-cyan">
+        <div class="stat-icon si-cyan"><i class="bi bi-droplet-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ total_riegos|default:"0" }}</h3>
+            <p>Mis Riegos</p>
+        </div>
+    </div>
+    <div class="stat-card sc-orange">
+        <div class="stat-icon si-orange"><i class="bi bi-flower1"></i></div>
+        <div class="stat-content">
+            <h3>{{ total_cosechas|default:"0" }}</h3>
+            <p>Mis Cosechas</p>
+        </div>
+    </div>
+    <div class="stat-card sc-indigo">
+        <div class="stat-icon si-indigo"><i class="bi bi-bell-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ notificaciones_no_leidas|default:"0" }}</h3>
+            <p>Notificaciones Pendientes</p>
+        </div>
+    </div>
+    <div class="stat-card sc-purple">
+        <div class="stat-icon si-purple"><i class="bi bi-chat-left-text-fill"></i></div>
+        <div class="stat-content">
+            <h3>{{ observaciones_no_leidas|default:"0" }}</h3>
+            <p>Observaciones Técnicas Nuevas</p>
+        </div>
+    </div>
 </div>
 
 {% endif %}

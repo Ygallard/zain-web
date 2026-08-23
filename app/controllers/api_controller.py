@@ -15,6 +15,7 @@ settings = config.load_config()
 # En Django estas rutas se publican en /api/auth/*
 DJANGO_AUTH_API = "http://127.0.0.1:8000/api/auth"
 DJANGO_BASE_URL = "http://127.0.0.1:8000"
+DJANGO_WEATHER_CURRENT_API = f"{DJANGO_BASE_URL}/api/weather/current/"
 
 
 def is_authenticated():
@@ -84,6 +85,25 @@ def get_django_dashboard_stats(token):
             return payload.get("data", {}), None
     except requests.exceptions.RequestException as exc:
         return None, str(exc)
+
+
+def get_django_weather_current(station_id=None):
+    """Consulta la API interna de clima de Django."""
+    url = DJANGO_WEATHER_CURRENT_API
+    if station_id:
+        url = f"{url}?station_id={station_id}"
+
+    try:
+        response = requests.get(url, timeout=10, headers={"X-Requested-With": "XMLHttpRequest"})
+        return response.json(), response.status_code
+    except requests.exceptions.RequestException as exc:
+        return {
+            "success": False,
+            "error": "Centro meteorológico no disponible.",
+            "details": str(exc),
+        }, 503
+    except ValueError:
+        return {"success": False, "error": "Centro meteorológico no disponible."}, 503
 
 
 @app.before_request
@@ -410,42 +430,18 @@ def get_flowmeter_data():
 
 
 @app.route("/api/weather")
-def get_weather_empty():
-    """Obtiene datos meteorológicos usando la estación por defecto configurada en .env"""
-    from app.utils.weathercloud_py import WeathercloudAPI
-    
-    # Obtener la ID de estación desde las variables de entorno
-    default_station = settings.get('WEATHERCLOUD_DEVICEID')
-    if not default_station:
-        return jsonify({
-            "error": "No se ha configurado una estación por defecto en WEATHER_CLOUD_DEVICEID"
-        }), 400
-        
-    try:
-        weather_api = WeathercloudAPI()
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 401
-        
-    data = weather_api.get_weather(default_station)
-
-    if "error" in data:
-        if "autenticación" in data["error"].lower():
-            return jsonify(data), 401
-        elif "ID inválido" in data["error"]:
-            return jsonify(data), 400
-        return jsonify(data), 500
-        
-    return jsonify(data)
+@app.route("/api/weather/current/")
+def get_weather_current():
+    """Compatibilidad con el frontend actual: proxy hacia la API interna de Django."""
+    payload, status_code = get_django_weather_current(settings.get("WEATHERCLOUD_DEVICEID"))
+    return jsonify(payload), status_code
 
 
 @app.route("/api/weather/<station_id>")
 def get_weather_station(station_id):
     """Obtiene datos meteorológicos de una estación específica de Weathercloud"""
-    from app.utils.weathercloud_py import WeathercloudAPI
-    weather_api = WeathercloudAPI()
-    
-    data = weather_api.get_weather(station_id)
-    return jsonify(data)
+    payload, status_code = get_django_weather_current(station_id)
+    return jsonify(payload), status_code
 
 
 @app.route("/api/weather/nearest")

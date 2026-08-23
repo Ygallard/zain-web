@@ -1,7 +1,18 @@
 from django import forms
 from django.contrib.auth.hashers import make_password
 
-from .models import AplicacionQuimica, Cosecha, Cuartel, Fertilizacion, Predio, Riego, Usuario
+from .models import (
+    AplicacionQuimica,
+    ComentarioTecnico,
+    Cosecha,
+    Cuartel,
+    Fertilizacion,
+    LaborAgricola,
+    Notificacion,
+    Predio,
+    Riego,
+    Usuario,
+)
 from .permissions import get_form_cuarteles_queryset, get_form_predios_queryset
 
 
@@ -26,6 +37,13 @@ class UsuarioCreateForm(EstadoCheckboxMixin, forms.ModelForm):
     class Meta:
         model = Usuario
         fields = ["rut", "nombre", "usuario", "password", "rol", "celular", "sector", "estado"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["sector"].required = False
+        self.fields["sector"].widget = forms.Select(
+            choices=[("", "Selecciona un sector")] + list(Usuario.SECTOR_CHOICES)
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -59,6 +77,13 @@ class UsuarioUpdateForm(EstadoCheckboxMixin, forms.ModelForm):
     class Meta:
         model = Usuario
         fields = ["rut", "nombre", "usuario", "rol", "celular", "sector", "estado"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["sector"].required = False
+        self.fields["sector"].widget = forms.Select(
+            choices=[("", "Selecciona un sector")] + list(Usuario.SECTOR_CHOICES)
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -102,7 +127,18 @@ class PredioBaseForm(EstadoCheckboxMixin, forms.ModelForm):
 
     class Meta:
         model = Predio
-        fields = ["usuario", "nombre_predio", "ubicacion", "superficie", "descripcion", "estado"]
+        fields = [
+            "usuario",
+            "nombre_predio",
+            "ubicacion",
+            "superficie_hectareas",
+            "inscripcion_cbr",
+            "inscripcion_agua",
+            "geolocalizacion_lat",
+            "geolocalizacion_lng",
+            "descripcion",
+            "estado",
+        ]
 
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop("request", None)
@@ -134,11 +170,18 @@ class PredioBaseForm(EstadoCheckboxMixin, forms.ModelForm):
             raise forms.ValidationError("El nombre del predio es obligatorio.")
         return nombre_predio
 
-    def clean_superficie(self):
-        superficie = self.cleaned_data.get("superficie")
+    def clean_superficie_hectareas(self):
+        superficie = self.cleaned_data.get("superficie_hectareas")
         if superficie is not None and superficie < 0:
-            raise forms.ValidationError("La superficie no puede ser negativa.")
+            raise forms.ValidationError("La superficie por hectárea no puede ser negativa.")
         return superficie
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.superficie = self.cleaned_data.get("superficie_hectareas")
+        if commit:
+            instance.save()
+        return instance
 
 
 class PredioCreateForm(PredioBaseForm):
@@ -179,6 +222,17 @@ class CuartelBaseForm(EstadoCheckboxMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         if request:
             self.fields["predio"].queryset = get_form_predios_queryset(request)
+
+        choices = [("", "Selecciona tipo de plantación")]
+        choices.extend(Cuartel.TIPO_PLANTACION_CHOICES)
+
+        current_value = (self.instance.tipo_cultivo if self.instance and self.instance.pk else None) or ""
+        if current_value and current_value not in {value for value, _ in Cuartel.TIPO_PLANTACION_CHOICES}:
+            choices.append((current_value, current_value))
+
+        self.fields["tipo_cultivo"].required = False
+        self.fields["tipo_cultivo"].widget = forms.Select(choices=choices)
+        self.fields["tipo_cultivo"].label = "Tipo de Plantación"
 
     def clean_nombre_cuartel(self):
         nombre = (self.cleaned_data.get("nombre_cuartel") or "").strip()
@@ -230,7 +284,7 @@ class RiegoBaseForm(EstadoCheckboxMixin, forms.ModelForm):
             "cuartel",
             "fecha_riego",
             "tipo_riego",
-            "horas_riego",
+            "minutos_riego",
             "caudal",
             "observaciones",
             "estado",
@@ -242,6 +296,13 @@ class RiegoBaseForm(EstadoCheckboxMixin, forms.ModelForm):
 
         if request:
             self.fields["predio"].queryset = get_form_predios_queryset(request)
+
+        tipo_choices = [("", "Selecciona tipo de riego")] + list(Riego.TIPO_RIEGO_CHOICES)
+        current_tipo = (self.instance.tipo_riego if self.instance and self.instance.pk else None) or ""
+        if current_tipo and current_tipo not in {value for value, _ in Riego.TIPO_RIEGO_CHOICES}:
+            tipo_choices.append((current_tipo, current_tipo))
+        self.fields["tipo_riego"].required = False
+        self.fields["tipo_riego"].widget = forms.Select(choices=tipo_choices)
 
         predio_id = None
         if self.is_bound:
@@ -268,11 +329,19 @@ class RiegoBaseForm(EstadoCheckboxMixin, forms.ModelForm):
 
         return cleaned_data
 
-    def clean_horas_riego(self):
-        horas = self.cleaned_data.get("horas_riego")
-        if horas is not None and horas < 0:
-            raise forms.ValidationError("Las horas de riego no pueden ser negativas.")
-        return horas
+    def clean_minutos_riego(self):
+        minutos = self.cleaned_data.get("minutos_riego")
+        if minutos is not None and minutos < 0:
+            raise forms.ValidationError("Los minutos de riego no pueden ser negativos.")
+        return minutos
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        minutos = self.cleaned_data.get("minutos_riego")
+        instance.horas_riego = (minutos / 60) if minutos is not None else None
+        if commit:
+            instance.save()
+        return instance
 
     def clean_caudal(self):
         caudal = self.cleaned_data.get("caudal")
@@ -317,6 +386,13 @@ class FertilizacionBaseForm(EstadoCheckboxMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
+
+        product_choices = [("", "Selecciona un producto")] + list(Fertilizacion.PRODUCTO_CHOICES)
+        current_producto = (self.instance.producto if self.instance and self.instance.pk else None) or ""
+        if current_producto and current_producto not in {value for value, _ in Fertilizacion.PRODUCTO_CHOICES}:
+            product_choices.append((current_producto, current_producto))
+        self.fields["producto"].required = False
+        self.fields["producto"].widget = forms.Select(choices=product_choices)
 
         if request:
             self.fields["predio"].queryset = get_form_predios_queryset(request)
@@ -518,3 +594,106 @@ class AplicacionQuimicaCreateForm(AplicacionQuimicaBaseForm):
 
 class AplicacionQuimicaUpdateForm(AplicacionQuimicaBaseForm):
     pass
+
+
+class LaborAgricolaBaseForm(EstadoCheckboxMixin, forms.ModelForm):
+    predio = PredioChoiceField(
+        queryset=Predio.objects.filter(estado=True).order_by("nombre_predio"),
+        empty_label="Selecciona un predio",
+    )
+    cuartel = CuartelRiegoChoiceField(
+        queryset=Cuartel.objects.select_related("predio")
+        .filter(estado=True, predio__estado=True)
+        .order_by("predio__nombre_predio", "nombre_cuartel"),
+        empty_label="Selecciona un cuartel",
+    )
+
+    class Meta:
+        model = LaborAgricola
+        fields = [
+            "predio",
+            "cuartel",
+            "fecha",
+            "tipo_labor",
+            "subtipo",
+            "responsable",
+            "descripcion",
+            "observaciones",
+            "estado",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+
+        tipo_choices = [("", "Selecciona tipo de labor")] + list(LaborAgricola.TIPO_LABOR_CHOICES)
+        self.fields["tipo_labor"].widget = forms.Select(choices=tipo_choices)
+
+        if request:
+            self.fields["predio"].queryset = get_form_predios_queryset(request)
+
+        predio_id = None
+        if self.is_bound:
+            predio_id = self.data.get("predio")
+        elif self.instance and self.instance.pk:
+            predio_id = self.instance.cuartel.predio_id
+            self.fields["predio"].initial = predio_id
+
+        if request:
+            self.fields["cuartel"].queryset = get_form_cuarteles_queryset(request, predio_id)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        predio = cleaned_data.get("predio")
+        cuartel = cleaned_data.get("cuartel")
+        tipo_labor = (cleaned_data.get("tipo_labor") or "").strip()
+        subtipo = (cleaned_data.get("subtipo") or "").strip()
+
+        if predio and cuartel and cuartel.predio_id != predio.id:
+            self.add_error("cuartel", "El cuartel seleccionado no pertenece al predio indicado.")
+
+        if tipo_labor in {"poda", "brote"} and not subtipo:
+            self.add_error("subtipo", "El subtipo es obligatorio para el tipo de labor seleccionado.")
+
+        return cleaned_data
+
+
+class LaborAgricolaCreateForm(LaborAgricolaBaseForm):
+    pass
+
+
+class LaborAgricolaUpdateForm(LaborAgricolaBaseForm):
+    pass
+
+
+class ComentarioTecnicoForm(forms.ModelForm):
+    class Meta:
+        model = ComentarioTecnico
+        fields = ["comentario"]
+        widgets = {
+            "comentario": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def clean_comentario(self):
+        comentario = self.cleaned_data["comentario"].strip()
+        if not comentario:
+            raise forms.ValidationError("El comentario no puede estar vacío.")
+        return comentario
+
+
+class NotificacionForm(forms.ModelForm):
+    class Meta:
+        model = Notificacion
+        fields = ["titulo", "mensaje"]
+
+    def clean_titulo(self):
+        titulo = self.cleaned_data["titulo"].strip()
+        if not titulo:
+            raise forms.ValidationError("El título es obligatorio.")
+        return titulo
+
+    def clean_mensaje(self):
+        mensaje = self.cleaned_data["mensaje"].strip()
+        if not mensaje:
+            raise forms.ValidationError("El mensaje es obligatorio.")
+        return mensaje

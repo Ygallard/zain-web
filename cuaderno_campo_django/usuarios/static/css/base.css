@@ -565,6 +565,24 @@ html, body {
     border-bottom: none;
 }
 
+.table tbody tr.js-row-detail {
+    cursor: pointer;
+    transition: background-color var(--transition-speed) ease, transform 0.16s ease, box-shadow 0.2s ease;
+}
+
+.table tbody tr.js-row-detail:hover {
+    background-color: #eef5fb;
+    box-shadow: inset 0 0 0 1px #d6e5f2;
+}
+
+.table tbody tr.js-row-detail:active {
+    transform: scale(0.998);
+}
+
+.table tbody tr.row-detail-loading {
+    opacity: 0.65;
+}
+
 /* ============================================
    FORMULARIOS
    ============================================ */
@@ -768,8 +786,10 @@ select.form-control {
 
 .modal-overlay.active {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    padding: 1rem 1rem 1.2rem;
+    overflow-y: auto;
 }
 
 .modal {
@@ -778,8 +798,11 @@ select.form-control {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     max-width: 500px;
     width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
+    max-height: calc(100vh - 2.2rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin: auto 0;
     animation: slideUp 0.3s ease;
 }
 
@@ -813,6 +836,8 @@ select.form-control {
 
 .modal-body {
     padding: 1.5rem;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .modal-footer {
@@ -821,6 +846,202 @@ select.form-control {
     justify-content: flex-end;
     padding: 1.5rem;
     border-top: 1px solid #ecf0f1;
+    background: #fff;
+    flex-shrink: 0;
+}
+
+.detail-modal {
+    max-width: 920px;
+    border-radius: 16px;
+    border: 1px solid #d7e3ee;
+    overflow: hidden;
+    box-shadow: 0 22px 56px rgba(21, 44, 67, 0.26);
+}
+
+.detail-modal-header {
+    background: linear-gradient(135deg, #eef6fb 0%, #ffffff 72%);
+    border-bottom: 1px solid #dbe7f2;
+}
+
+.detail-modal-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.detail-modal-title-line {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.detail-modal-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: linear-gradient(135deg, #2f8f62 0%, #56b67f 100%);
+    box-shadow: 0 8px 18px rgba(47, 143, 98, 0.28);
+}
+
+.detail-modal .modal-title {
+    font-size: 1.18rem;
+    letter-spacing: 0.15px;
+}
+
+.detail-modal-subtitle {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #698096;
+}
+
+.detail-modal-body {
+    padding-right: 0.55rem;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.detail-section-card + .detail-section-card {
+    margin-top: 1rem;
+}
+
+.detail-section-title {
+    font-size: 0.98rem;
+    margin-bottom: 0.75rem;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5eef6;
+}
+
+.detail-section-title i {
+    color: #3e89bd;
+    font-size: 1rem;
+}
+
+.detail-section-card {
+    background: #ffffff;
+    border: 1px solid #dce9f4;
+    border-radius: 12px;
+    padding: 0.9rem;
+    box-shadow: 0 8px 18px rgba(41, 74, 104, 0.09);
+}
+
+.detail-rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem 0.8rem;
+}
+
+.detail-row {
+    border: 1px solid #dce8f2;
+    border-radius: 10px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(155px, 42%) minmax(0, 58%);
+}
+
+.detail-row-full {
+    grid-column: 1 / -1;
+}
+
+.detail-cell {
+    padding: 0.62rem 0.72rem;
+}
+
+.detail-cell-label {
+    background: linear-gradient(180deg, #ecf5fb 0%, #f4f9fd 100%);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #4b6b86;
+    letter-spacing: 0.35px;
+    border-right: 1px solid #d7e6f3;
+}
+
+.detail-cell-value {
+    background: #ffffff;
+    color: #1f3348;
+}
+
+.detail-value {
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #1f3348;
+    line-height: 1.45;
+}
+
+.detail-value-empty {
+    color: #8397ab;
+    font-style: italic;
+}
+
+.detail-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.detail-badge-success {
+    color: #155f3a;
+    background: #dcf5e7;
+    border: 1px solid #b8e6cc;
+}
+
+.detail-badge-warning {
+    color: #8f6400;
+    background: #fff4d7;
+    border: 1px solid #f2ddb3;
+}
+
+.detail-badge-danger {
+    color: #8b2630;
+    background: #ffe1e4;
+    border: 1px solid #f0bcc3;
+}
+
+.detail-theme-water .detail-modal-icon {
+    background: linear-gradient(135deg, #1f84bf 0%, #4daee5 100%);
+    box-shadow: 0 8px 18px rgba(31, 132, 191, 0.28);
+}
+
+.detail-theme-harvest .detail-modal-icon {
+    background: linear-gradient(135deg, #bc7a1f 0%, #d69f42 100%);
+    box-shadow: 0 8px 18px rgba(188, 122, 31, 0.28);
+}
+
+.detail-theme-fertilizer .detail-modal-icon {
+    background: linear-gradient(135deg, #2f8f62 0%, #58bd88 100%);
+}
+
+.detail-theme-chem .detail-modal-icon {
+    background: linear-gradient(135deg, #6d72c2 0%, #8c8ed9 100%);
+    box-shadow: 0 8px 18px rgba(109, 114, 194, 0.28);
+}
+
+.detail-theme-land .detail-modal-icon {
+    background: linear-gradient(135deg, #2d8a79 0%, #4bb4a2 100%);
+}
+
+.detail-theme-user .detail-modal-icon {
+    background: linear-gradient(135deg, #4d79c8 0%, #6d98e1 100%);
+}
+
+.detail-theme-audit .detail-modal-icon {
+    background: linear-gradient(135deg, #4b6a89 0%, #6f8ba7 100%);
+}
+
+.detail-empty {
+    color: #6c7f90;
+    margin: 0;
 }
 
 /* ============================================
@@ -1000,6 +1221,23 @@ select.form-control {
 
     .modal {
         max-width: 95%;
+    }
+
+    .detail-modal-subtitle {
+        font-size: 0.82rem;
+    }
+
+    .detail-rows {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-row {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-cell-label {
+        border-right: none;
+        border-bottom: 1px solid #d7e6f3;
     }
 
     .table {

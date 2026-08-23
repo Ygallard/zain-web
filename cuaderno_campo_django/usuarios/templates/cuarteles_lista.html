@@ -138,9 +138,11 @@
             <i class="bi bi-search"></i>
             <input type="text" id="searchInput" class="form-control" placeholder="Buscar por cuartel, predio, cultivo, variedad o estado" oninput="filterCuarteles()">
         </div>
-        <button type="button" class="btn btn-primary" onclick="openAddCuartelModal()">
-            <i class="bi bi-plus-circle-fill"></i> Agregar Cuartel
-        </button>
+        {% if can_manage %}
+            <button type="button" class="btn btn-primary" onclick="openAddCuartelModal()">
+                <i class="bi bi-plus-circle-fill"></i> Agregar Cuartel
+            </button>
+        {% endif %}
     </div>
 
     <div class="table-responsive table-users-wrap">
@@ -150,7 +152,7 @@
                     <th>ID</th>
                     <th>Predio</th>
                     <th>Nombre Cuartel</th>
-                    <th>Tipo Cultivo</th>
+                    <th>Tipo Plantación</th>
                     <th>Variedad</th>
                     <th>Forma Riego</th>
                     <th>Superficie</th>
@@ -161,11 +163,11 @@
             </thead>
             <tbody id="cuartelesTableBody">
                 {% for cuartel in cuarteles %}
-                <tr data-id="{{ cuartel.id }}" data-search="{{ cuartel.nombre_cuartel|lower }} {{ cuartel.predio.nombre_predio|lower }} {{ cuartel.tipo_cultivo|default:''|lower }} {{ cuartel.variedad|default:''|lower }} {% if cuartel.estado %}activo{% else %}inactivo{% endif %}">
+                <tr data-id="{{ cuartel.id }}" class="row-clickable" onclick="openRegistroDetalle('cuartel', {{ cuartel.id }})" data-search="{{ cuartel.nombre_cuartel|lower }} {{ cuartel.predio.nombre_predio|lower }} {{ cuartel.tipo_cultivo|default:''|lower }} {{ cuartel.variedad|default:''|lower }} {% if cuartel.estado %}activo{% else %}inactivo{% endif %}">
                     <td>{{ cuartel.id }}</td>
                     <td>{{ cuartel.predio.nombre_predio }}</td>
                     <td><div class="user-name">{{ cuartel.nombre_cuartel }}</div></td>
-                    <td>{{ cuartel.tipo_cultivo|default:'-' }}</td>
+                    <td>{{ cuartel.get_tipo_cultivo_display|default:cuartel.tipo_cultivo|default:'-' }}</td>
                     <td>{{ cuartel.variedad|default:'-' }}</td>
                     <td>{{ cuartel.get_forma_riego_display|default:'-' }}</td>
                     <td>{{ cuartel.superficie|default:'-' }}</td>
@@ -177,21 +179,23 @@
                         {% endif %}
                     </td>
                     <td>{{ cuartel.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
-                    <td class="actions-cell">
-                        <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel({{ cuartel.id }})">
-                            <i class="bi bi-pencil-fill"></i> Editar
-                        </button>
-                        <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado({{ cuartel.id }}, {{ cuartel.estado|yesno:'true,false' }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
-                            <i class="bi bi-slash-circle-fill"></i> {% if cuartel.estado %}Desactivar{% else %}Activar{% endif %}
-                        </button>
-                        <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel({{ cuartel.id }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
-                            <i class="bi bi-trash-fill"></i> Eliminar
-                        </button>
-                    </td>
+                    {% if can_manage %}
+                        <td class="actions-cell" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel({{ cuartel.id }})">
+                                <i class="bi bi-pencil-fill"></i> Editar
+                            </button>
+                            <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado({{ cuartel.id }}, {{ cuartel.estado|yesno:'true,false' }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
+                                <i class="bi bi-slash-circle-fill"></i> {% if cuartel.estado %}Desactivar{% else %}Activar{% endif %}
+                            </button>
+                            <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel({{ cuartel.id }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
+                                <i class="bi bi-trash-fill"></i> Eliminar
+                            </button>
+                        </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
                 <tr id="cuartelesEmptyRow">
-                    <td colspan="10" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cuarteles registrados.</td>
+                    <td colspan="{% if can_manage %}10{% else %}9{% endif %}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cuarteles registrados.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -200,7 +204,7 @@
 
     <div class="cards-mobile" id="cuartelesCards">
         {% for cuartel in cuarteles %}
-        <div class="user-card" data-id="{{ cuartel.id }}" data-search="{{ cuartel.nombre_cuartel|lower }} {{ cuartel.predio.nombre_predio|lower }} {{ cuartel.tipo_cultivo|default:''|lower }} {{ cuartel.variedad|default:''|lower }} {% if cuartel.estado %}activo{% else %}inactivo{% endif %}">
+        <div class="user-card row-clickable" onclick="openRegistroDetalle('cuartel', {{ cuartel.id }})" data-id="{{ cuartel.id }}" data-search="{{ cuartel.nombre_cuartel|lower }} {{ cuartel.predio.nombre_predio|lower }} {{ cuartel.tipo_cultivo|default:''|lower }} {{ cuartel.variedad|default:''|lower }} {% if cuartel.estado %}activo{% else %}inactivo{% endif %}">
             <div class="user-card-head">
                 <div>
                     <div class="user-name">{{ cuartel.nombre_cuartel }}</div>
@@ -215,18 +219,20 @@
                 </div>
             </div>
             <div class="user-card-info"><strong>ID:</strong> {{ cuartel.id }}</div>
-            <div class="user-card-info"><strong>Tipo cultivo:</strong> {{ cuartel.tipo_cultivo|default:'-' }}</div>
+            <div class="user-card-info"><strong>Tipo plantación:</strong> {{ cuartel.get_tipo_cultivo_display|default:cuartel.tipo_cultivo|default:'-' }}</div>
             <div class="user-card-info"><strong>Variedad:</strong> {{ cuartel.variedad|default:'-' }}</div>
             <div class="user-card-info"><strong>Forma riego:</strong> {{ cuartel.get_forma_riego_display|default:'-' }}</div>
             <div class="user-card-info"><strong>Superficie:</strong> {{ cuartel.superficie|default:'-' }}</div>
             <div class="user-card-info"><strong>Creación:</strong> {{ cuartel.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
-            <div class="actions-cell" style="margin-top: 0.9rem;">
-                <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel({{ cuartel.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
-                <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado({{ cuartel.id }}, {{ cuartel.estado|yesno:'true,false' }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
-                    <i class="bi bi-slash-circle-fill"></i> {% if cuartel.estado %}Desactivar{% else %}Activar{% endif %}
-                </button>
-                <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel({{ cuartel.id }}, '{{ cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
-            </div>
+            {% if can_manage %}
+                <div class="actions-cell" style="margin-top: 0.9rem;" onclick="event.stopPropagation()">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel({{ cuartel.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado({{ cuartel.id }}, {{ cuartel.estado|yesno:'true,false' }}, '{{ cuartel.nombre_cuartel|escapejs }}')">
+                        <i class="bi bi-slash-circle-fill"></i> {% if cuartel.estado %}Desactivar{% else %}Activar{% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel({{ cuartel.id }}, '{{ cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -264,10 +270,18 @@
                         <small class="field-error" id="error-nombre_cuartel"></small>
                     </div>
 
-                    <!-- Tipo cultivo -->
+                    <!-- Tipo plantación -->
                     <div class="form-group">
-                        <label class="form-label" for="tipo_cultivo">Tipo Cultivo</label>
-                        <input class="form-control" type="text" id="tipo_cultivo" name="tipo_cultivo" placeholder="Vid, Manzano, Cerezo…">
+                        <label class="form-label" for="tipo_cultivo">Tipo de Plantación</label>
+                        <select class="form-control" id="tipo_cultivo" name="tipo_cultivo">
+                            <option value="">Selecciona tipo de plantación</option>
+                            <option value="olivo">Olivo</option>
+                            <option value="durazno">Durazno</option>
+                            <option value="damasco">Damasco</option>
+                            <option value="tunales">Tunales</option>
+                            <option value="higueras">Higueras</option>
+                            <option value="otros">Otros</option>
+                        </select>
                         <small class="field-error" id="error-tipo_cultivo"></small>
                     </div>
 
@@ -339,6 +353,8 @@
 
 {% block extra_js %}
 <script>
+    const CAN_MANAGE_CUARTELES = {{ can_manage|yesno:'true,false' }};
+
     function csrfToken() {
         return document.querySelector('#cuartelForm input[name="csrfmiddlewaretoken"]').value;
     }
@@ -430,17 +446,8 @@
     }
 
     function renderCuartelRow(c) {
-        return `
-            <tr data-id="${c.id}" data-search="${cuartelSearchText(c)}">
-                <td>${c.id}</td>
-                <td>${c.predio_nombre}</td>
-                <td><div class="user-name">${c.nombre_cuartel}</div></td>
-                <td>${c.tipo_cultivo || '-'}</td>
-                <td>${c.variedad || '-'}</td>
-                <td>${c.forma_riego_label || '-'}</td>
-                <td>${c.superficie || '-'}</td>
-                <td>${estadoBadge(c.estado)}</td>
-                <td>${c.created_at || '-'}</td>
+        const acciones = CAN_MANAGE_CUARTELES
+            ? `
                 <td class="actions-cell">
                     <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel(${c.id})">
                         <i class="bi bi-pencil-fill"></i> Editar
@@ -452,11 +459,38 @@
                         <i class="bi bi-trash-fill"></i> Eliminar
                     </button>
                 </td>
+            `
+            : '';
+
+        return `
+            <tr data-id="${c.id}" data-search="${cuartelSearchText(c)}">
+                <td>${c.id}</td>
+                <td>${c.predio_nombre}</td>
+                <td><div class="user-name">${c.nombre_cuartel}</div></td>
+                <td>${c.tipo_cultivo_label || c.tipo_cultivo || '-'}</td>
+                <td>${c.variedad || '-'}</td>
+                <td>${c.forma_riego_label || '-'}</td>
+                <td>${c.superficie || '-'}</td>
+                <td>${estadoBadge(c.estado)}</td>
+                <td>${c.created_at || '-'}</td>
+                ${acciones}
             </tr>
         `;
     }
 
     function renderCuartelCard(c) {
+        const acciones = CAN_MANAGE_CUARTELES
+            ? `
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel(${c.id})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado(${c.id}, ${c.estado}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(c.estado)}
+                    </button>
+                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel(${c.id}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                </div>
+            `
+            : '';
+
         return `
             <div class="user-card" data-id="${c.id}" data-search="${cuartelSearchText(c)}">
                 <div class="user-card-head">
@@ -467,18 +501,12 @@
                     <div>${estadoBadge(c.estado)}</div>
                 </div>
                 <div class="user-card-info"><strong>ID:</strong> ${c.id}</div>
-                <div class="user-card-info"><strong>Tipo cultivo:</strong> ${c.tipo_cultivo || '-'}</div>
+                <div class="user-card-info"><strong>Tipo plantación:</strong> ${c.tipo_cultivo_label || c.tipo_cultivo || '-'}</div>
                 <div class="user-card-info"><strong>Variedad:</strong> ${c.variedad || '-'}</div>
                 <div class="user-card-info"><strong>Forma riego:</strong> ${c.forma_riego_label || '-'}</div>
                 <div class="user-card-info"><strong>Superficie:</strong> ${c.superficie || '-'}</div>
                 <div class="user-card-info"><strong>Creación:</strong> ${c.created_at || '-'}</div>
-                <div class="actions-cell" style="margin-top: 0.9rem;">
-                    <button class="btn btn-sm btn-primary" type="button" onclick="editCuartel(${c.id})"><i class="bi bi-pencil-fill"></i> Editar</button>
-                    <button class="btn btn-sm btn-secondary" type="button" onclick="toggleCuartelEstado(${c.id}, ${c.estado}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')">
-                        <i class="bi bi-slash-circle-fill"></i> ${toggleLabel(c.estado)}
-                    </button>
-                    <button class="btn btn-sm btn-danger" type="button" onclick="deleteCuartel(${c.id}, '${c.nombre_cuartel.replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
-                </div>
+                ${acciones}
             </div>
         `;
     }
@@ -632,6 +660,36 @@
             card.style.display = card.dataset.search.includes(term) ? '' : 'none';
         });
     }
+
+    initRecordRowDetails({
+        containerSelector: '#cuartelesTableBody',
+        fetchUrl: (id) => `/cuarteles/${id}/`,
+        parseResponse: (payload) => payload.cuartel,
+        title: (cuartel) => `Detalle de cuartel: ${cuartel.nombre_cuartel || ''}`,
+        buildSections: (cuartel) => [
+            {
+                title: 'Identificación',
+                fields: [
+                    { label: 'ID', value: cuartel.id },
+                    { label: 'Predio', value: cuartel.predio_nombre },
+                    { label: 'Nombre cuartel', value: cuartel.nombre_cuartel },
+                    { label: 'Estado', value: cuartel.estado ? 'Activo' : 'Inactivo' },
+                    { label: 'Fecha creación', value: cuartel.created_at },
+                ],
+            },
+            {
+                title: 'Información agrícola',
+                fields: [
+                    { label: 'Tipo de plantación', value: cuartel.tipo_cultivo_label || cuartel.tipo_cultivo },
+                    { label: 'Variedad', value: cuartel.variedad },
+                    { label: 'Forma de riego', value: cuartel.forma_riego_label || cuartel.forma_riego },
+                    { label: 'Año plantación', value: cuartel.anio_plantacion },
+                    { label: 'Superficie', value: cuartel.superficie },
+                    { label: 'Descripción', value: cuartel.descripcion },
+                ],
+            },
+        ],
+    });
 
     document.getElementById('cuartelModal').addEventListener('click', function (event) {
         if (event.target === this) closeCuartelModal();

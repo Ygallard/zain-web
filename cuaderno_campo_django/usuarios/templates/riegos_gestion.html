@@ -255,7 +255,7 @@
                     <th>Predio</th>
                     <th>Cuartel</th>
                     <th>Tipo</th>
-                    <th>Horas</th>
+                    <th>Minutos</th>
                     <th>Caudal</th>
                     <th>Litros</th>
                     <th>Estado</th>
@@ -264,12 +264,12 @@
             </thead>
             <tbody>
                 {% for riego in riegos %}
-                    <tr>
+                    <tr data-id="{{ riego.id }}" class="row-clickable" onclick="openRegistroDetalle('riego', {{ riego.id }})">
                         <td>{{ riego.fecha_riego|date:'d/m/Y'|default:'-' }}</td>
                         <td>{{ riego.cuartel.predio.nombre_predio }}</td>
                         <td><span class="user-name">{{ riego.cuartel.nombre_cuartel }}</span></td>
-                        <td>{{ riego.tipo_riego|default:'-' }}</td>
-                        <td>{{ riego.horas_riego|default:'-' }}</td>
+                        <td>{{ riego.get_tipo_riego_display|default:riego.tipo_riego|default:'-' }}</td>
+                        <td>{{ riego.minutos_riego|default:'-' }}</td>
                         <td>{{ riego.caudal|default:'-' }}</td>
                         <td>{{ riego.litros_estimados|default:0|floatformat:2 }}</td>
                         <td>
@@ -280,7 +280,7 @@
                             {% endif %}
                         </td>
                         {% if can_manage %}
-                            <td class="actions-cell">
+                            <td class="actions-cell" onclick="event.stopPropagation()">
                                 <button class="btn btn-sm btn-primary" type="button" onclick="editRiego({{ riego.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
                                 <button class="btn btn-sm btn-secondary" type="button" onclick="toggleRiegoEstado({{ riego.id }}, {{ riego.estado|yesno:'true,false' }}, '{{ riego.cuartel.nombre_cuartel|escapejs }}')">
                                     <i class="bi bi-slash-circle-fill"></i> {% if riego.estado %}Desactivar{% else %}Activar{% endif %}
@@ -300,7 +300,7 @@
 
     <div class="cards-mobile">
         {% for riego in riegos %}
-            <div class="user-card">
+            <div class="user-card row-clickable" onclick="openRegistroDetalle('riego', {{ riego.id }})">
                 <div class="user-card-head">
                     <div>
                         <div class="user-name">{{ riego.cuartel.nombre_cuartel }}</div>
@@ -315,12 +315,12 @@
                     </div>
                 </div>
                 <div class="user-card-info"><strong>Fecha:</strong> {{ riego.fecha_riego|date:'d/m/Y'|default:'-' }}</div>
-                <div class="user-card-info"><strong>Tipo:</strong> {{ riego.tipo_riego|default:'-' }}</div>
-                <div class="user-card-info"><strong>Horas:</strong> {{ riego.horas_riego|default:'-' }}</div>
+                <div class="user-card-info"><strong>Tipo:</strong> {{ riego.get_tipo_riego_display|default:riego.tipo_riego|default:'-' }}</div>
+                <div class="user-card-info"><strong>Minutos:</strong> {{ riego.minutos_riego|default:'-' }}</div>
                 <div class="user-card-info"><strong>Caudal:</strong> {{ riego.caudal|default:'-' }}</div>
                 <div class="user-card-info"><strong>Litros:</strong> {{ riego.litros_estimados|default:0|floatformat:2 }}</div>
                 {% if can_manage %}
-                    <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <div class="actions-cell" style="margin-top: 0.9rem;" onclick="event.stopPropagation()">
                         <button class="btn btn-sm btn-primary" type="button" onclick="editRiego({{ riego.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
                         <button class="btn btn-sm btn-secondary" type="button" onclick="toggleRiegoEstado({{ riego.id }}, {{ riego.estado|yesno:'true,false' }}, '{{ riego.cuartel.nombre_cuartel|escapejs }}')">
                             <i class="bi bi-slash-circle-fill"></i> {% if riego.estado %}Desactivar{% else %}Activar{% endif %}
@@ -387,14 +387,19 @@
 
                     <div class="form-group">
                         <label class="form-label" for="tipo_riego">Tipo Riego</label>
-                        <input class="form-control" type="text" id="tipo_riego" name="tipo_riego" placeholder="Goteo, Aspersion, Tendido...">
+                        <select class="form-control" id="tipo_riego" name="tipo_riego">
+                            <option value="">Selecciona tipo de riego</option>
+                            <option value="goteo">Goteo</option>
+                            <option value="tendido_taza">Tendido (x taza)</option>
+                            <option value="aspersion">Aspersión</option>
+                        </select>
                         <small class="field-error" id="error-tipo_riego"></small>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="horas_riego">Horas Riego</label>
-                        <input class="form-control" type="number" id="horas_riego" name="horas_riego" min="0" step="0.01" placeholder="2.50">
-                        <small class="field-error" id="error-horas_riego"></small>
+                        <label class="form-label" for="minutos_riego">Minutos de riego</label>
+                        <input class="form-control" type="number" id="minutos_riego" name="minutos_riego" min="0" step="0.01" placeholder="150">
+                        <small class="field-error" id="error-minutos_riego"></small>
                     </div>
 
                     <div class="form-group">
@@ -502,6 +507,37 @@
             event.preventDefault();
             triggerFileDownload(this);
         });
+    });
+
+    initRecordRowDetails({
+        containerSelector: '.table-users-wrap tbody',
+        fetchUrl: (id) => `/riegos/${id}/`,
+        parseResponse: (payload) => payload.riego,
+        title: (riego) => `Detalle de riego: ${riego.cuartel_nombre || ''}`,
+        buildSections: (riego) => [
+            {
+                title: 'Registro de riego',
+                fields: [
+                    { label: 'ID', value: riego.id },
+                    { label: 'Predio', value: riego.predio_nombre },
+                    { label: 'Cuartel', value: riego.cuartel_nombre },
+                    { label: 'Tipo de riego', value: riego.tipo_riego_label || riego.tipo_riego },
+                    { label: 'Minutos', value: riego.minutos_riego },
+                    { label: 'Caudal', value: riego.caudal },
+                    { label: 'Litros estimados', value: riego.litros },
+                    { label: 'Fecha', value: riego.fecha_riego },
+                    { label: 'Responsable', value: riego.responsable },
+                    { label: 'Estado', value: riego.estado ? 'Activo' : 'Inactivo' },
+                ],
+            },
+            {
+                title: 'Observaciones y trazabilidad',
+                fields: [
+                    { label: 'Observaciones', value: riego.observaciones },
+                    { label: 'Fecha creación', value: riego.created_at },
+                ],
+            },
+        ],
     });
 
     if (CAN_MANAGE_RIEGO) {
@@ -612,7 +648,7 @@
             await loadCuartelesByPredio(r.predio_id, r.cuartel_id);
             document.getElementById('fecha_riego').value = r.fecha_riego_iso || '';
             document.getElementById('tipo_riego').value = r.tipo_riego || '';
-            document.getElementById('horas_riego').value = r.horas_riego || '';
+            document.getElementById('minutos_riego').value = r.minutos_riego || '';
             document.getElementById('caudal').value = r.caudal || '';
             document.getElementById('observaciones').value = r.observaciones || '';
             document.getElementById('estadoModal').checked = !!r.estado;

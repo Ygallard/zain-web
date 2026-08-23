@@ -166,7 +166,7 @@
             </thead>
             <tbody>
                 {% for log in logs %}
-                    <tr>
+                    <tr data-id="{{ log.id }}">
                         <td>{{ log.usuario.nombre }} ({{ log.usuario.usuario }})</td>
                         <td>
                             <span class="badge-action {% if log.accion == 'CREAR' %}badge-crear{% elif log.accion == 'EDITAR' %}badge-editar{% elif log.accion == 'ELIMINAR' %}badge-eliminar{% elif log.accion == 'LOGIN' %}badge-login{% elif log.accion == 'LOGOUT' %}badge-logout{% else %}badge-logout{% endif %}">
@@ -202,4 +202,37 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    initRecordRowDetails({
+        containerSelector: '.table-logs tbody',
+        fetchUrl: (id) => `/auditoria/logs/${id}/`,
+        parseResponse: (payload) => payload.log,
+        title: 'Detalle de auditoría',
+        buildSections: (log) => [
+            {
+                title: 'Evento',
+                fields: [
+                    { label: 'ID', value: log.id },
+                    { label: 'Acción', value: log.accion },
+                    { label: 'Módulo', value: log.modulo },
+                    { label: 'Fecha', value: log.fecha },
+                    { label: 'Hora', value: log.hora },
+                    { label: 'Fecha y hora', value: log.fecha_hora },
+                ],
+            },
+            {
+                title: 'Usuario y descripción',
+                fields: [
+                    { label: 'Usuario', value: log.usuario_nombre },
+                    { label: 'Login', value: log.usuario_login },
+                    { label: 'Rol', value: log.usuario_rol },
+                    { label: 'Descripción', value: log.descripcion },
+                ],
+            },
+        ],
+    });
+</script>
 {% endblock %}

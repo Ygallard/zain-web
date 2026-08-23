@@ -306,7 +306,7 @@
 			<i class="bi bi-search"></i>
 			<input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, cuartel, tipo, calidad o destino" oninput="filterCosechas()">
 		</div>
-		<button type="button" class="btn btn-primary" onclick="openAddCosechaModal()">
+		<button type="button" class="btn btn-primary" onclick="openAddCosechaModal()" {% if not can_manage %}style="display:none;"{% endif %}>
 			<i class="bi bi-plus-circle-fill"></i> Agregar Cosecha
 		</button>
 	</div>
@@ -326,12 +326,12 @@
 					<th>Destino</th>
 					<th>Estado</th>
 					<th>Fecha creación</th>
-					<th>Acciones</th>
+					{% if can_manage %}<th>Acciones</th>{% endif %}
 				</tr>
 			</thead>
 			<tbody id="cosechasTableBody">
 				{% for cosecha in cosechas %}
-				<tr data-id="{{ cosecha.id }}" data-search="{{ cosecha.cuartel.predio.nombre_predio|lower }} {{ cosecha.cuartel.nombre_cuartel|lower }} {{ cosecha.tipo_cosecha|default:''|lower }} {{ cosecha.calidad|default:''|lower }} {{ cosecha.destino|default:''|lower }} {% if cosecha.estado %}activa{% else %}inactiva{% endif %}">
+				<tr data-id="{{ cosecha.id }}" class="row-clickable" onclick="openRegistroDetalle('cosecha', {{ cosecha.id }})" data-search="{{ cosecha.cuartel.predio.nombre_predio|lower }} {{ cosecha.cuartel.nombre_cuartel|lower }} {{ cosecha.tipo_cosecha|default:''|lower }} {{ cosecha.calidad|default:''|lower }} {{ cosecha.destino|default:''|lower }} {% if cosecha.estado %}activa{% else %}inactiva{% endif %}">
 					<td>{{ cosecha.id }}</td>
 					<td>{{ cosecha.cuartel.predio.nombre_predio }}</td>
 					<td><div class="user-name">{{ cosecha.cuartel.nombre_cuartel }}</div></td>
@@ -349,7 +349,8 @@
 						{% endif %}
 					</td>
 					<td>{{ cosecha.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
-					<td class="actions-cell">
+					{% if can_manage %}
+					<td class="actions-cell" onclick="event.stopPropagation()">
 						<button class="btn btn-sm btn-primary" type="button" onclick="editCosecha({{ cosecha.id }})">
 							<i class="bi bi-pencil-fill"></i> Editar
 						</button>
@@ -360,10 +361,11 @@
 							<i class="bi bi-trash-fill"></i> Eliminar
 						</button>
 					</td>
+					{% endif %}
 				</tr>
 				{% empty %}
 				<tr id="cosechasEmptyRow">
-					<td colspan="12" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cosechas registradas.</td>
+					<td colspan="{% if can_manage %}12{% else %}11{% endif %}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay cosechas registradas.</td>
 				</tr>
 				{% endfor %}
 			</tbody>
@@ -372,7 +374,7 @@
 
 	<div class="cards-mobile" id="cosechasCards">
 		{% for cosecha in cosechas %}
-		<div class="user-card" data-id="{{ cosecha.id }}" data-search="{{ cosecha.cuartel.predio.nombre_predio|lower }} {{ cosecha.cuartel.nombre_cuartel|lower }} {{ cosecha.tipo_cosecha|default:''|lower }} {{ cosecha.calidad|default:''|lower }} {{ cosecha.destino|default:''|lower }} {% if cosecha.estado %}activa{% else %}inactiva{% endif %}">
+		<div class="user-card row-clickable" onclick="openRegistroDetalle('cosecha', {{ cosecha.id }})" data-id="{{ cosecha.id }}" data-search="{{ cosecha.cuartel.predio.nombre_predio|lower }} {{ cosecha.cuartel.nombre_cuartel|lower }} {{ cosecha.tipo_cosecha|default:''|lower }} {{ cosecha.calidad|default:''|lower }} {{ cosecha.destino|default:''|lower }} {% if cosecha.estado %}activa{% else %}inactiva{% endif %}">
 			<div class="user-card-head">
 				<div>
 					<div class="user-name">{{ cosecha.cuartel.nombre_cuartel }}</div>
@@ -394,13 +396,15 @@
 			<div class="user-card-info"><strong>Calidad:</strong> {{ cosecha.get_calidad_display|default:'-' }}</div>
 			<div class="user-card-info"><strong>Destino:</strong> {{ cosecha.get_destino_display|default:'-' }}</div>
 			<div class="user-card-info"><strong>Creación:</strong> {{ cosecha.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
-			<div class="actions-cell" style="margin-top: 0.9rem;">
+			{% if can_manage %}
+			<div class="actions-cell" style="margin-top: 0.9rem;" onclick="event.stopPropagation()">
 				<button class="btn btn-sm btn-primary" type="button" onclick="editCosecha({{ cosecha.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
 				<button class="btn btn-sm btn-secondary" type="button" onclick="toggleCosechaEstado({{ cosecha.id }}, {{ cosecha.estado|yesno:'true,false' }}, '{{ cosecha.cuartel.nombre_cuartel|escapejs }}')">
 					<i class="bi bi-slash-circle-fill"></i> {% if cosecha.estado %}Desactivar{% else %}Activar{% endif %}
 				</button>
 				<button class="btn btn-sm btn-danger" type="button" onclick="deleteCosecha({{ cosecha.id }}, '{{ cosecha.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
 			</div>
+			{% endif %}
 		</div>
 		{% endfor %}
 	</div>
@@ -1018,6 +1022,39 @@
 		});
 		document.querySelectorAll('#cosechasCards .user-card[data-search]').forEach((card) => {
 			card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+		});
+	}
+
+	if (isCosechasGestionView) {
+		initRecordRowDetails({
+			containerSelector: '#cosechasTableBody',
+			fetchUrl: (id) => `/cosechas/${id}/`,
+			parseResponse: (payload) => payload.cosecha,
+			title: (cosecha) => `Detalle de cosecha: ${cosecha.cuartel_nombre || ''}`,
+			buildSections: (cosecha) => [
+				{
+					title: 'Registro de cosecha',
+					fields: [
+						{ label: 'ID', value: cosecha.id },
+						{ label: 'Predio', value: cosecha.predio_nombre },
+						{ label: 'Cuartel', value: cosecha.cuartel_nombre },
+						{ label: 'Fecha cosecha', value: cosecha.fecha_cosecha },
+						{ label: 'Tipo cosecha', value: cosecha.tipo_cosecha },
+						{ label: 'Cantidad KG', value: cosecha.cantidad_kg },
+						{ label: 'Cantidad bins', value: cosecha.cantidad_bins },
+						{ label: 'Calidad', value: cosecha.calidad_label || cosecha.calidad },
+						{ label: 'Destino', value: cosecha.destino_label || cosecha.destino },
+						{ label: 'Estado', value: cosecha.estado_label || (cosecha.estado ? 'Activa' : 'Inactiva') },
+					],
+				},
+				{
+					title: 'Observaciones y fechas',
+					fields: [
+						{ label: 'Observaciones', value: cosecha.observaciones },
+						{ label: 'Fecha creación', value: cosecha.created_at },
+					],
+				},
+			],
 		});
 	}
 

@@ -18,8 +18,6 @@ class RoleBasedAccessMiddleware:
     """
     
     ADMIN_ONLY_PREFIXES = (
-        "/usuarios/",
-        "/auditoria/",
         "/admin/",
     )
     

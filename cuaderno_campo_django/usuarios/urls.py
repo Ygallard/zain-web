@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/dashboard/stats/", views.dashboard_stats_api, name="dashboard_stats_api"),
     path("acceso-denegado/", views.acceso_denegado_view, name="acceso_denegado"),
     path("auditoria/logs/", views.auditoria_logs_view, name="auditoria_logs"),
+    path("auditoria/logs/<int:pk>/", views.auditoria_log_detail_view, name="auditoria_logs_detalle"),
 
     # API endpoints para autenticación centralizada
     path("api/auth/login/", api.auth_login, name="api_auth_login"),
@@ -19,6 +20,7 @@ urlpatterns = [
     path("api/auth/logout/", api.auth_logout, name="api_auth_logout"),
     path("api/auth/sso/", api.auth_sso, name="api_auth_sso"),
     path("api/auth/activity/", api.auth_activity_log, name="api_auth_activity"),
+    path("api/weather/current/", api.weather_current, name="api_weather_current"),
 
     # Usuarios
     path("usuarios/", views.usuario_list_view, name="usuarios_lista"),
@@ -27,6 +29,9 @@ urlpatterns = [
     path("usuarios/<int:pk>/editar/", views.usuario_update_view, name="usuarios_editar"),
     path("usuarios/<int:pk>/toggle-estado/", views.usuario_toggle_estado_view, name="usuarios_toggle_estado"),
     path("usuarios/<int:pk>/eliminar/", views.usuario_delete_view, name="usuarios_eliminar"),
+
+    # Productores (solo lectura, para PRODESAL)
+    path("productores/", views.productores_lista_view, name="productores_lista"),
 
     # Predios
     path("predios/", views.predio_list_view, name="predios_lista"),
@@ -87,6 +92,27 @@ urlpatterns = [
     path("aplicaciones-quimicas/<int:pk>/toggle-estado/", views.aplicacion_quimica_toggle_estado_view, name="aplicaciones_quimicas_toggle_estado"),
     path("aplicaciones-quimicas/<int:pk>/eliminar/", views.aplicacion_quimica_delete_view, name="aplicaciones_quimicas_eliminar"),
 
+    # Labores Agrícolas
+    path("labores-agricolas/", views.labores_agricolas_list_view, name="labores_agricolas_lista"),
+    path("labores-agricolas/analitica/", views.labores_agricolas_analitica_view, name="labores_agricolas_analitica"),
+    path("api/labores-agricolas/analitica/", views.labores_agricolas_analytics_api, name="labores_agricolas_analytics_api"),
+    path("labores-agricolas/exportar/pdf/", views.labores_agricolas_export_pdf_view, name="labores_agricolas_export_pdf"),
+    path("labores-agricolas/exportar/excel/", views.labores_agricolas_export_excel_view, name="labores_agricolas_export_excel"),
+    path("labores-agricolas/crear/", views.labor_agricola_create_view, name="labores_agricolas_crear"),
+    path("labores-agricolas/<int:pk>/", views.labor_agricola_detail_view, name="labores_agricolas_detalle"),
+    path("labores-agricolas/<int:pk>/editar/", views.labor_agricola_update_view, name="labores_agricolas_editar"),
+    path("labores-agricolas/<int:pk>/toggle-estado/", views.labor_agricola_toggle_estado_view, name="labores_agricolas_toggle_estado"),
+    path("labores-agricolas/<int:pk>/eliminar/", views.labor_agricola_delete_view, name="labores_agricolas_eliminar"),
+
     # Predios - Cuarteles
     path("predios/<int:predio_id>/cuarteles/", views.cuarteles_por_predio_view, name="predios_cuarteles"),
+
+    # Comentarios técnicos (PRODESAL)
+    path("comentarios/<str:modulo>/<int:objeto_id>/", views.comentarios_por_registro_view, name="comentarios_lista"),
+    path("comentarios/<str:modulo>/<int:objeto_id>/crear/", views.comentario_create_view, name="comentarios_crear"),
+
+    # Notificaciones
+    path("notificaciones/", views.notificaciones_list_view, name="notificaciones_lista"),
+    path("notificaciones/crear/", views.notificacion_create_view, name="notificaciones_crear"),
+    path("notificaciones/<int:pk>/marcar-leida/", views.notificacion_marcar_leida_view, name="notificaciones_marcar_leida"),
 ]

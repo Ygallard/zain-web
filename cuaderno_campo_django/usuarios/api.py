@@ -7,6 +7,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import check_password
 from django.shortcuts import redirect
+import logging
 import json
 import hmac
 import hashlib
@@ -15,6 +16,10 @@ from .audit import IMPORTANT_AUDIT_ACTIONS, registrar_auditoria
 from .models import LogActividad, Usuario
 from django.conf import settings
 from .decorators import AUTH_SESSION_KEY
+from .services.weather_service import WeatherService
+
+
+logger = logging.getLogger(__name__)
 
 # Token cache - en producción usar Redis
 TOKEN_CACHE = {}
@@ -348,3 +353,39 @@ def auth_activity_log(request):
         return JsonResponse({"success": False, "error": "No se pudo registrar el log"}, status=500)
 
     return JsonResponse({"success": True, "log_id": log.id})
+
+
+@require_http_methods(["GET"])
+def weather_current(request):
+    """Obtiene el estado meteorológico actual desde Weather Underground."""
+    station_id = (request.GET.get("station_id") or "").strip() or None
+
+    try:
+        payload = WeatherService().get_current_weather(station_id=station_id)
+        if not payload.get("success"):
+            logger.warning("Weather Service no disponible: %s", payload.get("error", "sin detalle"))
+            return JsonResponse({"success": False, "error": "Centro meteorológico no disponible."}, status=503)
+
+        # Transformar respuesta al formato solicitado
+        data = payload.get("data") or payload
+        response_data = {
+            "temperature": data.get("temperature"),
+            "humidity": data.get("humidity"),
+            "wind_speed": data.get("wind_speed"),
+            "wind_direction": data.get("wind_direction"),
+            "pressure": data.get("pressure"),
+            "rain_day": data.get("rain_day"),
+            "uv": data.get("uv"),
+            "feels_like": data.get("feels_like"),
+            "updated_at": data.get("updated_at"),
+            "updated_at_text": data.get("updated_at_text"),
+        }
+        
+        return JsonResponse({
+            "success": True,
+            "data": response_data,
+            "cached": payload.get("cached", False)
+        })
+    except Exception:
+        logger.exception("Error inesperado al obtener datos meteorológicos")
+        return JsonResponse({"success": False, "error": "Centro meteorológico no disponible."}, status=503)

@@ -4,6 +4,12 @@
 {% block title %}Gestión de Predios - Cuaderno de Campo Digital{% endblock %}
 
 {% block extra_css %}
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+/>
 <style>
     .users-toolbar {
         display: flex;
@@ -152,21 +158,21 @@
                     <th>ID</th>
                     <th>Nombre Predio</th>
                     <th>Ubicación</th>
-                    <th>Superficie</th>
+                    <th>Superficie por hectárea</th>
                     <th>Estado</th>
                     {% if can_manage %}<th>Acciones</th>{% endif %}
                 </tr>
             </thead>
             <tbody id="prediosTableBody">
                 {% for predio in predios %}
-                <tr data-id="{{ predio.id }}" data-search="{{ predio.nombre_predio|lower }} {{ predio.ubicacion|default:''|lower }} {{ predio.usuario.nombre|lower }} {{ predio.usuario.usuario|lower }} {% if predio.estado %}activo{% else %}inactivo{% endif %}">
+                <tr data-id="{{ predio.id }}" class="row-clickable" onclick="openRegistroDetalle('predio', {{ predio.id }})" data-search="{{ predio.nombre_predio|lower }} {{ predio.ubicacion|default:''|lower }} {{ predio.usuario.nombre|lower }} {{ predio.usuario.usuario|lower }} {% if predio.estado %}activo{% else %}inactivo{% endif %}">
                     <td>{{ predio.id }}</td>
                     <td>
                         <div class="user-name">{{ predio.nombre_predio }}</div>
                         <small style="color:#7f8c8d;">{{ predio.usuario.nombre }}</small>
                     </td>
                     <td>{{ predio.ubicacion|default:'-' }}</td>
-                    <td>{{ predio.superficie|default:'-' }}</td>
+                    <td>{{ predio.superficie_hectareas|default:predio.superficie|default:'-' }}</td>
                     <td>
                         {% if predio.estado %}
                             <span class="badge badge-success">Activo</span>
@@ -175,7 +181,7 @@
                         {% endif %}
                     </td>
                     {% if can_manage %}
-                        <td class="actions-cell">
+                        <td class="actions-cell" onclick="event.stopPropagation()">
                             <button class="btn btn-sm btn-primary" type="button" onclick="editPredio({{ predio.id }})">
                                 <i class="bi bi-pencil-fill"></i> Editar
                             </button>
@@ -199,7 +205,7 @@
 
     <div class="cards-mobile" id="prediosCards">
         {% for predio in predios %}
-        <div class="user-card" data-id="{{ predio.id }}" data-search="{{ predio.nombre_predio|lower }} {{ predio.ubicacion|default:''|lower }} {{ predio.usuario.nombre|lower }} {{ predio.usuario.usuario|lower }} {% if predio.estado %}activo{% else %}inactivo{% endif %}">
+        <div class="user-card row-clickable" onclick="openRegistroDetalle('predio', {{ predio.id }})" data-id="{{ predio.id }}" data-search="{{ predio.nombre_predio|lower }} {{ predio.ubicacion|default:''|lower }} {{ predio.usuario.nombre|lower }} {{ predio.usuario.usuario|lower }} {% if predio.estado %}activo{% else %}inactivo{% endif %}">
             <div class="user-card-head">
                 <div>
                     <div class="user-name">{{ predio.nombre_predio }}</div>
@@ -215,9 +221,9 @@
             </div>
             <div class="user-card-info"><strong>ID:</strong> {{ predio.id }}</div>
             <div class="user-card-info"><strong>Ubicación:</strong> {{ predio.ubicacion|default:'-' }}</div>
-            <div class="user-card-info"><strong>Superficie:</strong> {{ predio.superficie|default:'-' }}</div>
+            <div class="user-card-info"><strong>Superficie por hectárea:</strong> {{ predio.superficie_hectareas|default:predio.superficie|default:'-' }}</div>
             {% if can_manage %}
-                <div class="actions-cell" style="margin-top: 0.9rem;">
+                <div class="actions-cell" style="margin-top: 0.9rem;" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-primary" type="button" onclick="editPredio({{ predio.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
                     <button class="btn btn-sm btn-secondary" type="button" onclick="togglePredioEstado({{ predio.id }}, {{ predio.estado|yesno:'true,false' }}, '{{ predio.nombre_predio|escapejs }}')">
                         <i class="bi bi-slash-circle-fill"></i> {% if predio.estado %}Desactivar{% else %}Activar{% endif %}
@@ -267,9 +273,39 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="superficie">Superficie</label>
-                        <input class="form-control" type="number" id="superficie" name="superficie" min="0" step="0.01" placeholder="12.50">
-                        <small class="field-error" id="error-superficie"></small>
+                        <label class="form-label" for="superficie_hectareas">Superficie por hectárea</label>
+                        <input class="form-control" type="number" id="superficie_hectareas" name="superficie_hectareas" min="0" step="0.01" placeholder="12.50">
+                        <small class="field-error" id="error-superficie_hectareas"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="inscripcion_cbr">Inscripción CBR San Felipe (Fojas, Número, Año)</label>
+                        <input class="form-control" type="text" id="inscripcion_cbr" name="inscripcion_cbr" placeholder="Fojas 120, N° 56, 2024">
+                        <small class="field-error" id="error-inscripcion_cbr"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label" for="inscripcion_agua">Inscripción de agua</label>
+                        <textarea class="form-control" id="inscripcion_agua" name="inscripcion_agua" rows="3" placeholder="Detalle de derechos e inscripción de agua"></textarea>
+                        <small class="field-error" id="error-inscripcion_agua"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="geolocalizacion_lat">Latitud</label>
+                        <input class="form-control" type="number" id="geolocalizacion_lat" name="geolocalizacion_lat" step="0.0000001" placeholder="-32.7474" readonly>
+                        <small class="field-error" id="error-geolocalizacion_lat"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="geolocalizacion_lng">Longitud</label>
+                        <input class="form-control" type="number" id="geolocalizacion_lng" name="geolocalizacion_lng" step="0.0000001" placeholder="-70.6505" readonly>
+                        <small class="field-error" id="error-geolocalizacion_lng"></small>
+                    </div>
+
+                    <div class="form-group full">
+                        <label class="form-label">Ubicación del predio (OpenStreetMap)</label>
+                        <div id="predioMap" style="height: 300px; border: 1px solid #dbe4ee; border-radius: 8px;"></div>
+                        <small style="color:#7f8c8d;">Haz clic para seleccionar ubicación o arrastra el marcador para ajustar coordenadas.</small>
                     </div>
 
                     <div class="form-group full">
@@ -302,8 +338,16 @@
 {% endblock %}
 
 {% block extra_js %}
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
 <script>
     const CAN_MANAGE_PREDIOS = {{ can_manage|yesno:'true,false' }};
+    const SANTA_MARIA_CENTER = { lat: -32.747, lng: -70.656 };
+    let predioMapInstance = null;
+    let predioMapMarker = null;
 
     function csrfToken() {
         return document.querySelector('#predioForm input[name="csrfmiddlewaretoken"]').value;
@@ -315,6 +359,7 @@
             predio.ubicacion || '',
             predio.usuario_nombre || '',
             predio.usuario_label || '',
+            predio.inscripcion_cbr || '',
             predio.estado ? 'activo' : 'inactivo'
         ].join(' ').toLowerCase();
     }
@@ -367,6 +412,8 @@
         document.getElementById('predioForm').reset();
         document.getElementById('predioId').value = '';
         document.getElementById('estado').checked = true;
+        initPredioMap();
+        updateMapPositionFromFields();
         openModal('predioModal');
     }
 
@@ -390,10 +437,16 @@
         document.getElementById('usuario').value = predio.usuario_id || '';
         document.getElementById('nombre_predio').value = predio.nombre_predio || '';
         document.getElementById('ubicacion').value = predio.ubicacion || '';
-        document.getElementById('superficie').value = predio.superficie || '';
+        document.getElementById('superficie_hectareas').value = predio.superficie_hectareas || predio.superficie || '';
+        document.getElementById('inscripcion_cbr').value = predio.inscripcion_cbr || '';
+        document.getElementById('inscripcion_agua').value = predio.inscripcion_agua || '';
+        document.getElementById('geolocalizacion_lat').value = predio.geolocalizacion_lat || '';
+        document.getElementById('geolocalizacion_lng').value = predio.geolocalizacion_lng || '';
         document.getElementById('descripcion').value = predio.descripcion || '';
         document.getElementById('estado').checked = !!predio.estado;
 
+        initPredioMap();
+        updateMapPositionFromFields();
         openModal('predioModal');
     }
 
@@ -422,7 +475,7 @@
                     <small style="color:#7f8c8d;">${predio.usuario_nombre}</small>
                 </td>
                 <td>${predio.ubicacion || '-'}</td>
-                <td>${formatSuperficie(predio.superficie)}</td>
+                <td>${formatSuperficie(predio.superficie_hectareas || predio.superficie)}</td>
                 <td>${estadoBadge(predio.estado)}</td>
                 ${acciones}
             </tr>
@@ -453,10 +506,92 @@
                 </div>
                 <div class="user-card-info"><strong>ID:</strong> ${predio.id}</div>
                 <div class="user-card-info"><strong>Ubicación:</strong> ${predio.ubicacion || '-'}</div>
-                <div class="user-card-info"><strong>Superficie:</strong> ${formatSuperficie(predio.superficie)}</div>
+                <div class="user-card-info"><strong>Superficie por hectárea:</strong> ${formatSuperficie(predio.superficie_hectareas || predio.superficie)}</div>
                 ${acciones}
             </div>
         `;
+    }
+
+    function setLatLngFields(lat, lng) {
+        document.getElementById('geolocalizacion_lat').value = Number(lat).toFixed(7);
+        document.getElementById('geolocalizacion_lng').value = Number(lng).toFixed(7);
+    }
+
+    function updateMapPositionFromFields() {
+        if (!predioMapInstance || !window.L) return;
+        const lat = parseFloat(document.getElementById('geolocalizacion_lat').value);
+        const lng = parseFloat(document.getElementById('geolocalizacion_lng').value);
+        const hasCoordinates = !Number.isNaN(lat) && !Number.isNaN(lng);
+        const position = hasCoordinates ? { lat, lng } : SANTA_MARIA_CENTER;
+
+        predioMapInstance.setView([position.lat, position.lng], hasCoordinates ? predioMapInstance.getZoom() : 13);
+        if (hasCoordinates) {
+            if (!predioMapMarker) {
+                predioMapMarker = L.marker([position.lat, position.lng], { draggable: true }).addTo(predioMapInstance);
+                predioMapMarker.on('dragend', function (event) {
+                    const marker = event.target;
+                    const point = marker.getLatLng();
+                    setLatLngFields(point.lat, point.lng);
+                });
+            } else {
+                predioMapMarker.setLatLng([position.lat, position.lng]);
+                if (!predioMapInstance.hasLayer(predioMapMarker)) {
+                    predioMapMarker.addTo(predioMapInstance);
+                }
+            }
+        } else if (predioMapMarker) {
+            predioMapInstance.removeLayer(predioMapMarker);
+        }
+    }
+
+    function onMapClick(event) {
+        if (!event || !event.latlng) return;
+        const lat = event.latlng.lat;
+        const lng = event.latlng.lng;
+        setLatLngFields(lat, lng);
+        if (!predioMapMarker) {
+            predioMapMarker = L.marker([lat, lng], { draggable: true }).addTo(predioMapInstance);
+            predioMapMarker.on('dragend', function (dragEvent) {
+                const marker = dragEvent.target;
+                const point = marker.getLatLng();
+                setLatLngFields(point.lat, point.lng);
+            });
+        } else {
+            predioMapMarker.setLatLng([lat, lng]);
+            if (!predioMapInstance.hasLayer(predioMapMarker)) {
+                predioMapMarker.addTo(predioMapInstance);
+            }
+        }
+    }
+
+    function initPredioMap() {
+        const mapEl = document.getElementById('predioMap');
+        if (!mapEl) return;
+
+        if (!predioMapInstance && window.L) {
+            predioMapInstance = L.map(mapEl, {
+                center: [SANTA_MARIA_CENTER.lat, SANTA_MARIA_CENTER.lng],
+                zoom: 13,
+                zoomControl: true,
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors',
+            }).addTo(predioMapInstance);
+
+            predioMapInstance.on('click', onMapClick);
+
+            setTimeout(() => {
+                predioMapInstance.invalidateSize();
+            }, 50);
+        } else if (predioMapInstance) {
+            setTimeout(() => {
+                predioMapInstance.invalidateSize();
+            }, 50);
+        }
+
+        updateMapPositionFromFields();
     }
 
     function removeEmptyState() {
@@ -628,6 +763,37 @@
             card.style.display = card.dataset.search.includes(term) ? '' : 'none';
         });
     }
+
+    initRecordRowDetails({
+        containerSelector: '#prediosTableBody',
+        fetchUrl: (id) => `/predios/${id}/`,
+        parseResponse: (payload) => payload.predio,
+        title: (predio) => `Detalle de predio: ${predio.nombre_predio || ''}`,
+        buildSections: (predio) => [
+            {
+                title: 'Identificación',
+                fields: [
+                    { label: 'ID', value: predio.id },
+                    { label: 'Nombre predio', value: predio.nombre_predio },
+                    { label: 'Productor responsable', value: predio.usuario_nombre },
+                    { label: 'Estado', value: predio.estado ? 'Activo' : 'Inactivo' },
+                ],
+            },
+            {
+                title: 'Datos agrícolas y geográficos',
+                fields: [
+                    { label: 'Ubicación', value: predio.ubicacion },
+                    { label: 'Superficie por hectárea', value: predio.superficie_hectareas || predio.superficie },
+                    { label: 'Inscripción CBR', value: predio.inscripcion_cbr },
+                    { label: 'Inscripción de agua', value: predio.inscripcion_agua },
+                    { label: 'Latitud', value: predio.geolocalizacion_lat },
+                    { label: 'Longitud', value: predio.geolocalizacion_lng },
+                    { label: 'Descripción', value: predio.descripcion },
+                    { label: 'Fecha creación', value: predio.created_at },
+                ],
+            },
+        ],
+    });
 
     const predioModal = document.getElementById('predioModal');
     if (predioModal) {

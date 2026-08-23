@@ -540,14 +540,19 @@
 
                     <div class="form-group">
                         <label class="form-label" for="tipo_riego">Tipo Riego</label>
-                        <input class="form-control" type="text" id="tipo_riego" name="tipo_riego" placeholder="Goteo, Aspersion, Tendido...">
+                        <select class="form-control" id="tipo_riego" name="tipo_riego">
+                            <option value="">Selecciona tipo de riego</option>
+                            <option value="goteo">Goteo</option>
+                            <option value="tendido_taza">Tendido (x taza)</option>
+                            <option value="aspersion">Aspersión</option>
+                        </select>
                         <small class="field-error" id="error-tipo_riego"></small>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="horas_riego">Horas Riego</label>
-                        <input class="form-control" type="number" id="horas_riego" name="horas_riego" min="0" step="0.01" placeholder="2.50">
-                        <small class="field-error" id="error-horas_riego"></small>
+                        <label class="form-label" for="minutos_riego">Minutos de riego</label>
+                        <input class="form-control" type="number" id="minutos_riego" name="minutos_riego" min="0" step="0.01" placeholder="150">
+                        <small class="field-error" id="error-minutos_riego"></small>
                     </div>
 
                     <div class="form-group">
@@ -854,7 +859,7 @@
             await loadCuartelesByPredio(r.predio_id, r.cuartel_id);
             document.getElementById('fecha_riego').value = r.fecha_riego_iso || '';
             document.getElementById('tipo_riego').value = r.tipo_riego || '';
-            document.getElementById('horas_riego').value = r.horas_riego || '';
+            document.getElementById('minutos_riego').value = r.minutos_riego || '';
             document.getElementById('caudal').value = r.caudal || '';
             document.getElementById('observaciones').value = r.observaciones || '';
             document.getElementById('estadoModal').checked = !!r.estado;

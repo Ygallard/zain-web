@@ -1,0 +1,262 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Productores - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .users-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        max-width: 520px;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #7f8c8d;
+    }
+
+    .search-box input {
+        padding-left: 2.4rem;
+    }
+
+    .table-users th,
+    .table-users td {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .user-name {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .cards-mobile {
+        display: none;
+        gap: 1rem;
+    }
+
+    .user-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e8edf2;
+        box-shadow: var(--card-shadow);
+        padding: 1rem;
+    }
+
+    .user-card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .user-card-info {
+        font-size: 0.9rem;
+        color: #566573;
+        margin-bottom: 0.3rem;
+    }
+
+    @media (max-width: 992px) {
+        .table-users-wrap {
+            display: none;
+        }
+
+        .cards-mobile {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .users-toolbar {
+            align-items: stretch;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title"><i class="bi bi-people-fill"></i> Productores</h1>
+</div>
+
+<div class="card">
+    <div class="users-toolbar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre, usuario, rut o sector" oninput="filterProductores()">
+        </div>
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users" id="productoresTable">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Usuario</th>
+                    <th>Celular</th>
+                    <th>Sector</th>
+                    <th>Estado</th>
+                    <th>Fecha creación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for productor in productores %}
+                <tr data-search="{{ productor.nombre|lower }} {{ productor.usuario|lower }} {{ productor.rut|lower }} {{ productor.sector|default:''|lower }} {{ productor.celular|default:''|lower }}">
+                    <td>
+                        <div class="user-name">{{ productor.nombre }}</div>
+                        <small style="color:#7f8c8d;">{{ productor.rut }}</small>
+                    </td>
+                    <td>{{ productor.usuario }}</td>
+                    <td>{{ productor.celular|default:'-' }}</td>
+                    <td>{{ productor.sector|default:'-' }}</td>
+                    <td>
+                        {% if productor.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ productor.created_at|date:'d/m/Y H:i' }}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-primary" type="button" onclick="openNotificarModal({{ productor.id }}, '{{ productor.nombre|escapejs }}')">
+                            <i class="bi bi-bell-fill"></i> Notificar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay productores registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="cards-mobile" id="productoresCards">
+        {% for productor in productores %}
+            <div class="user-card" data-search="{{ productor.nombre|lower }} {{ productor.usuario|lower }} {{ productor.rut|lower }} {{ productor.sector|default:''|lower }} {{ productor.celular|default:''|lower }}">
+                <div class="user-card-head">
+                    <div>
+                        <div class="user-name">{{ productor.nombre }}</div>
+                        <div class="user-card-info">{{ productor.usuario }} - {{ productor.rut }}</div>
+                    </div>
+                    <div>
+                        {% if productor.estado %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactivo</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="user-card-info"><strong>Celular:</strong> {{ productor.celular|default:'-' }}</div>
+                <div class="user-card-info"><strong>Sector:</strong> {{ productor.sector|default:'-' }}</div>
+                <div class="user-card-info"><strong>Creación:</strong> {{ productor.created_at|date:'d/m/Y H:i' }}</div>
+                <div class="actions-cell" style="margin-top: 0.9rem;">
+                    <button class="btn btn-sm btn-primary" type="button" onclick="openNotificarModal({{ productor.id }}, '{{ productor.nombre|escapejs }}')">
+                        <i class="bi bi-bell-fill"></i> Notificar
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="notificarModal">
+    <div class="modal" style="max-width: 480px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="bi bi-bell-fill"></i> Enviar notificación</h2>
+            <button class="modal-close" type="button" onclick="closeModal('notificarModal')"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p>Destinatario: <strong id="notificarProductorNombre"></strong></p>
+            <input type="hidden" id="notificarProductorId">
+            <div class="form-group">
+                <label class="form-label" for="notificarTitulo">Título *</label>
+                <input class="form-control" type="text" id="notificarTitulo" placeholder="Ej: Revisar registro de cosecha">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="notificarMensaje">Mensaje *</label>
+                <textarea class="form-control" id="notificarMensaje" rows="4" placeholder="Detalle de la recomendación u observación"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('notificarModal')"><i class="bi bi-x-circle"></i> Cancelar</button>
+            <button class="btn btn-primary" type="button" onclick="enviarNotificacion()"><i class="bi bi-send-fill"></i> Enviar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filterProductores() {
+        const term = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+        document.querySelectorAll('#productoresTable tbody tr[data-search], #productoresCards .user-card[data-search]').forEach((el) => {
+            const matches = !term || el.dataset.search.includes(term);
+            el.style.display = matches ? '' : 'none';
+        });
+    }
+
+    function openNotificarModal(productorId, productorNombre) {
+        document.getElementById('notificarProductorId').value = productorId;
+        document.getElementById('notificarProductorNombre').textContent = productorNombre;
+        document.getElementById('notificarTitulo').value = '';
+        document.getElementById('notificarMensaje').value = '';
+        openModal('notificarModal');
+    }
+
+    async function enviarNotificacion() {
+        const productorId = document.getElementById('notificarProductorId').value;
+        const titulo = document.getElementById('notificarTitulo').value.trim();
+        const mensaje = document.getElementById('notificarMensaje').value.trim();
+
+        if (!titulo || !mensaje) {
+            showToast('Completa título y mensaje antes de enviar.', 'warning');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('productor_id', productorId);
+        formData.append('titulo', titulo);
+        formData.append('mensaje', mensaje);
+
+        try {
+            const response = await fetch('/notificaciones/crear/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData,
+            });
+            const payload = await response.json();
+            if (payload.success) {
+                showToast('Notificación enviada correctamente.', 'success');
+                closeModal('notificarModal');
+            } else {
+                showToast(payload.error || 'No se pudo enviar la notificación.', 'error');
+            }
+        } catch (error) {
+            showToast('Error al enviar la notificación.', 'error');
+        }
+    }
+</script>
+{% endblock %}

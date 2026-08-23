@@ -304,7 +304,7 @@
             <i class="bi bi-search"></i>
             <input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, cuartel, producto, tipo, responsable o estado" oninput="filterFertilizaciones()">
         </div>
-        <button type="button" class="btn btn-primary" onclick="openAddFertilizacionModal()">
+        <button type="button" class="btn btn-primary" onclick="openAddFertilizacionModal()" {% if not can_manage %}style="display:none;"{% endif %}>
             <i class="bi bi-plus-circle-fill"></i> Agregar Aplicación
         </button>
     </div>
@@ -325,12 +325,12 @@
                     <th>Responsable</th>
                     <th>Estado</th>
                     <th>Fecha creación</th>
-                    <th>Acciones</th>
+                    {% if can_manage %}<th>Acciones</th>{% endif %}
                 </tr>
             </thead>
             <tbody id="fertilizacionesTableBody">
                 {% for aplicacion in aplicaciones %}
-                <tr data-id="{{ aplicacion.id }}" data-search="{{ aplicacion.cuartel.predio.nombre_predio|lower }} {{ aplicacion.cuartel.nombre_cuartel|lower }} {{ aplicacion.producto|default:''|lower }} {{ aplicacion.tipo_producto|default:''|lower }} {{ aplicacion.metodo_aplicacion|default:''|lower }} {{ aplicacion.responsable|default:''|lower }} {% if aplicacion.estado %}activo{% else %}inactivo{% endif %}">
+                <tr data-id="{{ aplicacion.id }}" class="row-clickable" onclick="openRegistroDetalle('aplicacion_quimica', {{ aplicacion.id }})" data-search="{{ aplicacion.cuartel.predio.nombre_predio|lower }} {{ aplicacion.cuartel.nombre_cuartel|lower }} {{ aplicacion.producto|default:''|lower }} {{ aplicacion.tipo_producto|default:''|lower }} {{ aplicacion.metodo_aplicacion|default:''|lower }} {{ aplicacion.responsable|default:''|lower }} {% if aplicacion.estado %}activo{% else %}inactivo{% endif %}">
                     <td>{{ aplicacion.id }}</td>
                     <td>{{ aplicacion.cuartel.predio.nombre_predio }}</td>
                     <td><div class="user-name">{{ aplicacion.cuartel.nombre_cuartel }}</div></td>
@@ -349,7 +349,8 @@
                         {% endif %}
                     </td>
                     <td>{{ aplicacion.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
-                    <td class="actions-cell">
+                    {% if can_manage %}
+                    <td class="actions-cell" onclick="event.stopPropagation()">
                         <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion({{ aplicacion.id }})">
                             <i class="bi bi-pencil-fill"></i> Editar
                         </button>
@@ -360,10 +361,11 @@
                             <i class="bi bi-trash-fill"></i> Eliminar
                         </button>
                     </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
                 <tr id="fertilizacionesEmptyRow">
-                    <td colspan="13" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay aplicaciones químicas registradas.</td>
+                    <td colspan="{% if can_manage %}13{% else %}12{% endif %}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay aplicaciones químicas registradas.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -372,7 +374,7 @@
 
     <div class="cards-mobile" id="fertilizacionesCards">
         {% for aplicacion in aplicaciones %}
-        <div class="user-card" data-id="{{ aplicacion.id }}" data-search="{{ aplicacion.cuartel.predio.nombre_predio|lower }} {{ aplicacion.cuartel.nombre_cuartel|lower }} {{ aplicacion.producto|default:''|lower }} {{ aplicacion.tipo_producto|default:''|lower }} {{ aplicacion.metodo_aplicacion|default:''|lower }} {{ aplicacion.responsable|default:''|lower }} {% if aplicacion.estado %}activo{% else %}inactivo{% endif %}">
+        <div class="user-card row-clickable" onclick="openRegistroDetalle('aplicacion_quimica', {{ aplicacion.id }})" data-id="{{ aplicacion.id }}" data-search="{{ aplicacion.cuartel.predio.nombre_predio|lower }} {{ aplicacion.cuartel.nombre_cuartel|lower }} {{ aplicacion.producto|default:''|lower }} {{ aplicacion.tipo_producto|default:''|lower }} {{ aplicacion.metodo_aplicacion|default:''|lower }} {{ aplicacion.responsable|default:''|lower }} {% if aplicacion.estado %}activo{% else %}inactivo{% endif %}">
             <div class="user-card-head">
                 <div>
                     <div class="user-name">{{ aplicacion.cuartel.nombre_cuartel }}</div>
@@ -395,13 +397,15 @@
             <div class="user-card-info"><strong>Método:</strong> {{ aplicacion.metodo_aplicacion|default:'-' }}</div>
             <div class="user-card-info"><strong>Responsable:</strong> {{ aplicacion.responsable|default:'-' }}</div>
             <div class="user-card-info"><strong>Creación:</strong> {{ aplicacion.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
-            <div class="actions-cell" style="margin-top: 0.9rem;">
+            {% if can_manage %}
+            <div class="actions-cell" style="margin-top: 0.9rem;" onclick="event.stopPropagation()">
                 <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion({{ aplicacion.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
                 <button class="btn btn-sm btn-secondary" type="button" onclick="toggleFertilizacionEstado({{ aplicacion.id }}, {{ aplicacion.estado|yesno:'true,false' }}, '{{ aplicacion.cuartel.nombre_cuartel|escapejs }}')">
                     <i class="bi bi-slash-circle-fill"></i> {% if aplicacion.estado %}Desactivar{% else %}Activar{% endif %}
                 </button>
                 <button class="btn btn-sm btn-danger" type="button" onclick="deleteFertilizacion({{ aplicacion.id }}, '{{ aplicacion.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -1015,6 +1019,40 @@
         });
         document.querySelectorAll('#fertilizacionesCards .user-card[data-search]').forEach((card) => {
             card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+        });
+    }
+
+    if (isAplicacionesGestionView) {
+        initRecordRowDetails({
+            containerSelector: '#fertilizacionesTableBody',
+            fetchUrl: (id) => `/aplicaciones-quimicas/${id}/`,
+            parseResponse: (payload) => payload.aplicacion,
+            title: (aplicacion) => `Detalle de aplicación química: ${aplicacion.cuartel_nombre || ''}`,
+            buildSections: (aplicacion) => [
+                {
+                    title: 'Aplicación química',
+                    fields: [
+                        { label: 'ID', value: aplicacion.id },
+                        { label: 'Predio', value: aplicacion.predio_nombre },
+                        { label: 'Cuartel', value: aplicacion.cuartel_nombre },
+                        { label: 'Fecha aplicación', value: aplicacion.fecha_aplicacion },
+                        { label: 'Producto', value: aplicacion.producto },
+                        { label: 'Tipo producto', value: aplicacion.tipo_producto },
+                        { label: 'Dosis', value: aplicacion.dosis },
+                        { label: 'Unidad', value: aplicacion.unidad },
+                        { label: 'Método aplicación', value: aplicacion.metodo_aplicacion },
+                        { label: 'Responsable', value: aplicacion.responsable },
+                        { label: 'Estado', value: aplicacion.estado ? 'Activo' : 'Inactivo' },
+                    ],
+                },
+                {
+                    title: 'Observaciones y trazabilidad',
+                    fields: [
+                        { label: 'Observaciones', value: aplicacion.observaciones },
+                        { label: 'Fecha creación', value: aplicacion.created_at },
+                    ],
+                },
+            ],
         });
     }
 

@@ -304,7 +304,7 @@
             <i class="bi bi-search"></i>
             <input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, cuartel, producto, método o estado" oninput="filterFertilizaciones()">
         </div>
-        <button type="button" class="btn btn-primary" onclick="openAddFertilizacionModal()">
+        <button type="button" class="btn btn-primary" onclick="openAddFertilizacionModal()" {% if not can_manage %}style="display:none;"{% endif %}>
             <i class="bi bi-plus-circle-fill"></i> Agregar Fertilización
         </button>
     </div>
@@ -323,17 +323,17 @@
                     <th>Método Aplicación</th>
                     <th>Estado</th>
                     <th>Fecha creación</th>
-                    <th>Acciones</th>
+                    {% if can_manage %}<th>Acciones</th>{% endif %}
                 </tr>
             </thead>
             <tbody id="fertilizacionesTableBody">
                 {% for fertilizacion in fertilizaciones %}
-                <tr data-id="{{ fertilizacion.id }}" data-search="{{ fertilizacion.cuartel.predio.nombre_predio|lower }} {{ fertilizacion.cuartel.nombre_cuartel|lower }} {{ fertilizacion.producto|default:''|lower }} {{ fertilizacion.metodo_aplicacion|default:''|lower }} {% if fertilizacion.estado %}activo{% else %}inactivo{% endif %}">
+                <tr data-id="{{ fertilizacion.id }}" class="row-clickable" onclick="openRegistroDetalle('fertilizacion', {{ fertilizacion.id }})" data-search="{{ fertilizacion.cuartel.predio.nombre_predio|lower }} {{ fertilizacion.cuartel.nombre_cuartel|lower }} {{ fertilizacion.producto|default:''|lower }} {{ fertilizacion.metodo_aplicacion|default:''|lower }} {% if fertilizacion.estado %}activo{% else %}inactivo{% endif %}">
                     <td>{{ fertilizacion.id }}</td>
                     <td>{{ fertilizacion.cuartel.predio.nombre_predio }}</td>
                     <td><div class="user-name">{{ fertilizacion.cuartel.nombre_cuartel }}</div></td>
                     <td>{{ fertilizacion.fecha_aplicacion|date:'d/m/Y'|default:'-' }}</td>
-                    <td>{{ fertilizacion.producto|default:'-' }}</td>
+                    <td>{{ fertilizacion.get_producto_display|default:fertilizacion.producto|default:'-' }}</td>
                     <td>{{ fertilizacion.dosis|default:'-' }}</td>
                     <td>{{ fertilizacion.unidad|default:'-' }}</td>
                     <td>{{ fertilizacion.metodo_aplicacion|default:'-' }}</td>
@@ -345,7 +345,8 @@
                         {% endif %}
                     </td>
                     <td>{{ fertilizacion.created_at|date:'d/m/Y H:i'|default:'-' }}</td>
-                    <td class="actions-cell">
+                    {% if can_manage %}
+                    <td class="actions-cell" onclick="event.stopPropagation()">
                         <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion({{ fertilizacion.id }})">
                             <i class="bi bi-pencil-fill"></i> Editar
                         </button>
@@ -356,10 +357,11 @@
                             <i class="bi bi-trash-fill"></i> Eliminar
                         </button>
                     </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
                 <tr id="fertilizacionesEmptyRow">
-                    <td colspan="11" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay aplicaciones registradas.</td>
+                    <td colspan="{% if can_manage %}11{% else %}10{% endif %}" style="text-align:center; padding: 2rem; color:#7f8c8d;">No hay aplicaciones registradas.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -368,7 +370,7 @@
 
     <div class="cards-mobile" id="fertilizacionesCards">
         {% for fertilizacion in fertilizaciones %}
-        <div class="user-card" data-id="{{ fertilizacion.id }}" data-search="{{ fertilizacion.cuartel.predio.nombre_predio|lower }} {{ fertilizacion.cuartel.nombre_cuartel|lower }} {{ fertilizacion.producto|default:''|lower }} {{ fertilizacion.metodo_aplicacion|default:''|lower }} {% if fertilizacion.estado %}activo{% else %}inactivo{% endif %}">
+        <div class="user-card row-clickable" onclick="openRegistroDetalle('fertilizacion', {{ fertilizacion.id }})" data-id="{{ fertilizacion.id }}" data-search="{{ fertilizacion.cuartel.predio.nombre_predio|lower }} {{ fertilizacion.cuartel.nombre_cuartel|lower }} {{ fertilizacion.producto|default:''|lower }} {{ fertilizacion.metodo_aplicacion|default:''|lower }} {% if fertilizacion.estado %}activo{% else %}inactivo{% endif %}">
             <div class="user-card-head">
                 <div>
                     <div class="user-name">{{ fertilizacion.cuartel.nombre_cuartel }}</div>
@@ -384,18 +386,20 @@
             </div>
             <div class="user-card-info"><strong>ID:</strong> {{ fertilizacion.id }}</div>
             <div class="user-card-info"><strong>Fecha aplicación:</strong> {{ fertilizacion.fecha_aplicacion|date:'d/m/Y'|default:'-' }}</div>
-            <div class="user-card-info"><strong>Producto:</strong> {{ fertilizacion.producto|default:'-' }}</div>
+            <div class="user-card-info"><strong>Producto:</strong> {{ fertilizacion.get_producto_display|default:fertilizacion.producto|default:'-' }}</div>
             <div class="user-card-info"><strong>Dosis:</strong> {{ fertilizacion.dosis|default:'-' }}</div>
             <div class="user-card-info"><strong>Unidad:</strong> {{ fertilizacion.unidad|default:'-' }}</div>
             <div class="user-card-info"><strong>Método:</strong> {{ fertilizacion.metodo_aplicacion|default:'-' }}</div>
             <div class="user-card-info"><strong>Creación:</strong> {{ fertilizacion.created_at|date:'d/m/Y H:i'|default:'-' }}</div>
-            <div class="actions-cell" style="margin-top: 0.9rem;">
+            {% if can_manage %}
+            <div class="actions-cell" style="margin-top: 0.9rem;" onclick="event.stopPropagation()">
                 <button class="btn btn-sm btn-primary" type="button" onclick="editFertilizacion({{ fertilizacion.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
                 <button class="btn btn-sm btn-secondary" type="button" onclick="toggleFertilizacionEstado({{ fertilizacion.id }}, {{ fertilizacion.estado|yesno:'true,false' }}, '{{ fertilizacion.cuartel.nombre_cuartel|escapejs }}')">
                     <i class="bi bi-slash-circle-fill"></i> {% if fertilizacion.estado %}Desactivar{% else %}Activar{% endif %}
                 </button>
                 <button class="btn btn-sm btn-danger" type="button" onclick="deleteFertilizacion({{ fertilizacion.id }}, '{{ fertilizacion.cuartel.nombre_cuartel|escapejs }}')"><i class="bi bi-trash-fill"></i> Eliminar</button>
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -440,7 +444,13 @@
 
                     <div class="form-group">
                         <label class="form-label" for="producto">Producto</label>
-                        <input class="form-control" type="text" id="producto" name="producto" placeholder="NPK 20-20-20">
+                        <select class="form-control" id="producto" name="producto">
+                            <option value="">Selecciona un producto</option>
+                            <option value="urea">Urea</option>
+                            <option value="mezcla">Mezcla</option>
+                            <option value="nitrato_potasio">Nitrato Potasio</option>
+                            <option value="otro">Otro</option>
+                        </select>
                         <small class="field-error" id="error-producto"></small>
                     </div>
 
@@ -452,13 +462,22 @@
 
                     <div class="form-group">
                         <label class="form-label" for="unidad">Unidad</label>
-                        <input class="form-control" type="text" id="unidad" name="unidad" placeholder="kg/ha, L/ha">
+                        <select class="form-control" id="unidad" name="unidad">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="kg/ha">kg/ha</option>
+                            <option value="L/ha">L/ha</option>
+                        </select>
                         <small class="field-error" id="error-unidad"></small>
                     </div>
 
                     <div class="form-group full">
                         <label class="form-label" for="metodo_aplicacion">Método Aplicación</label>
-                        <input class="form-control" type="text" id="metodo_aplicacion" name="metodo_aplicacion" placeholder="Fertirriego, foliar, al suelo">
+                        <select class="form-control" id="metodo_aplicacion" name="metodo_aplicacion">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="Fertirriego">Fertirriego</option>
+                            <option value="Foliar">Foliar</option>
+                            <option value="Al suelo">Al suelo</option>
+                        </select>
                         <small class="field-error" id="error-metodo_aplicacion"></small>
                     </div>
 
@@ -780,8 +799,12 @@
         document.getElementById('fecha_aplicacion').value = f.fecha_aplicacion_iso || '';
         document.getElementById('producto').value = f.producto || '';
         document.getElementById('dosis').value = f.dosis || '';
-        document.getElementById('unidad').value = f.unidad || '';
-        document.getElementById('metodo_aplicacion').value = f.metodo_aplicacion || '';
+        const unidadSelect = document.getElementById('unidad');
+        unidadSelect.value = f.unidad || '';
+        if (!unidadSelect.value) unidadSelect.value = '';
+        const metodoSelect = document.getElementById('metodo_aplicacion');
+        metodoSelect.value = f.metodo_aplicacion || '';
+        if (!metodoSelect.value) metodoSelect.value = '';
         document.getElementById('observaciones').value = f.observaciones || '';
         document.getElementById('estado').checked = !!f.estado;
 
@@ -795,7 +818,7 @@
                 <td>${f.predio_nombre}</td>
                 <td><div class="user-name">${f.cuartel_nombre}</div></td>
                 <td>${f.fecha_aplicacion || '-'}</td>
-                <td>${f.producto || '-'}</td>
+                <td>${f.producto_label || f.producto || '-'}</td>
                 <td>${f.dosis || '-'}</td>
                 <td>${f.unidad || '-'}</td>
                 <td>${f.metodo_aplicacion || '-'}</td>
@@ -828,7 +851,7 @@
                 </div>
                 <div class="user-card-info"><strong>ID:</strong> ${f.id}</div>
                 <div class="user-card-info"><strong>Fecha aplicación:</strong> ${f.fecha_aplicacion || '-'}</div>
-                <div class="user-card-info"><strong>Producto:</strong> ${f.producto || '-'}</div>
+                <div class="user-card-info"><strong>Producto:</strong> ${f.producto_label || f.producto || '-'}</div>
                 <div class="user-card-info"><strong>Dosis:</strong> ${f.dosis || '-'}</div>
                 <div class="user-card-info"><strong>Unidad:</strong> ${f.unidad || '-'}</div>
                 <div class="user-card-info"><strong>Método:</strong> ${f.metodo_aplicacion || '-'}</div>
@@ -994,6 +1017,38 @@
         });
         document.querySelectorAll('#fertilizacionesCards .user-card[data-search]').forEach((card) => {
             card.style.display = card.dataset.search.includes(term) ? '' : 'none';
+        });
+    }
+
+    if (isFertilizacionGestionView) {
+        initRecordRowDetails({
+            containerSelector: '#fertilizacionesTableBody',
+            fetchUrl: (id) => `/fertilizaciones/${id}/`,
+            parseResponse: (payload) => payload.fertilizacion,
+            title: (fertilizacion) => `Detalle de fertilización: ${fertilizacion.cuartel_nombre || ''}`,
+            buildSections: (fertilizacion) => [
+                {
+                    title: 'Aplicación registrada',
+                    fields: [
+                        { label: 'ID', value: fertilizacion.id },
+                        { label: 'Predio', value: fertilizacion.predio_nombre },
+                        { label: 'Cuartel', value: fertilizacion.cuartel_nombre },
+                        { label: 'Fecha aplicación', value: fertilizacion.fecha_aplicacion },
+                        { label: 'Producto', value: fertilizacion.producto_label || fertilizacion.producto },
+                        { label: 'Dosis', value: fertilizacion.dosis },
+                        { label: 'Unidad', value: fertilizacion.unidad },
+                        { label: 'Método aplicación', value: fertilizacion.metodo_aplicacion },
+                        { label: 'Estado', value: fertilizacion.estado ? 'Activo' : 'Inactivo' },
+                    ],
+                },
+                {
+                    title: 'Observaciones y fechas',
+                    fields: [
+                        { label: 'Observaciones', value: fertilizacion.observaciones },
+                        { label: 'Fecha creación', value: fertilizacion.created_at },
+                    ],
+                },
+            ],
         });
     }
 

@@ -1,0 +1,437 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Labores Agrícolas - Cuaderno de Campo Digital{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+    .stat-card { background: #fff; border-radius: 10px; border: 1px solid #e8edf2; box-shadow: var(--card-shadow); padding: 1rem; display: flex; gap: 0.8rem; align-items: center; }
+    .stat-icon { width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .stat-icon.primary { background-color: rgba(52, 152, 219, 0.12); color: #3498db; }
+    .stat-icon.success { background-color: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+    .stat-icon.warning { background-color: rgba(241, 196, 15, 0.12); color: #f1c40f; }
+    .stat-icon.info { background-color: rgba(26, 188, 156, 0.12); color: #16a085; }
+    .stat-content h3 { margin: 0; line-height: 1; color: var(--primary-color); font-size: 1.5rem; }
+    .stat-content p { margin: 0.35rem 0 0; color: #7f8c8d; font-size: 0.9rem; }
+    .users-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .search-box { position: relative; flex: 1; min-width: 260px; max-width: 520px; }
+    .search-box i { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: #7f8c8d; }
+    .search-box input { padding-left: 2.4rem; }
+    .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .chart-card { background: #fff; border: 1px solid #e8edf2; border-radius: 10px; box-shadow: var(--card-shadow); padding: 1rem; }
+    .chart-title { margin: 0 0 0.8rem; color: var(--primary-color); font-size: 1rem; font-weight: 700; }
+    .chart-wrap { position: relative; width: 100%; min-height: 260px; max-height: 320px; }
+    .table-users th, .table-users td { white-space: nowrap; vertical-align: middle; }
+    .user-name { font-weight: 700; color: var(--primary-color); }
+    .actions-cell { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .cards-mobile { display: none; gap: 1rem; }
+    .user-card { background: #fff; border-radius: 10px; border: 1px solid #e8edf2; box-shadow: var(--card-shadow); padding: 1rem; }
+    .user-card-head { display: flex; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.8rem; }
+    .user-card-info { font-size: 0.9rem; color: #566573; margin-bottom: 0.3rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .field-error { color: #b42318; font-size: 0.85rem; margin-top: 0.35rem; display: none; }
+    .form-control.is-invalid { border-color: #dc3545; box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15); }
+    @media (max-width: 992px) { .charts-grid { grid-template-columns: 1fr; } .table-users-wrap { display: none; } .cards-mobile { display: grid; grid-template-columns: 1fr; } }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } .users-toolbar { align-items: stretch; } .users-toolbar .btn { width: 100%; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    {% if request.resolver_match.url_name == 'labores_agricolas_analitica' %}
+    <h1 class="page-title"><i class="bi bi-graph-up-arrow"></i> Analítica de Labores Agrícolas</h1>
+    {% else %}
+    <h1 class="page-title"><i class="bi bi-tools"></i> Gestión de Labores Agrícolas</h1>
+    {% endif %}
+</div>
+
+{% if request.resolver_match.url_name == 'labores_agricolas_analitica' %}
+{% include 'partials/analytics_filters.html' with analytics_description='Frecuencia de labores, tendencias por temporada y comportamiento por cuartel.' analytics_gestion_url='labores_agricolas_lista' %}
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title"><i class="bi bi-list-check"></i> Frecuencia por tipo de labor</h3>
+        <div class="chart-wrap"><canvas id="laboresFrecuenciaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3 class="chart-title"><i class="bi bi-grid-3x3-gap"></i> Labores por cuartel</h3>
+        <div class="chart-wrap"><canvas id="laboresCuartelChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="grid-column: 1 / -1;">
+        <h3 class="chart-title"><i class="bi bi-calendar3"></i> Labores por temporada</h3>
+        <div class="chart-wrap"><canvas id="laboresTemporadaChart"></canvas></div>
+    </div>
+</div>
+{% else %}
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-icon primary"><i class="bi bi-clipboard2-check"></i></div>
+        <div class="stat-content"><h3 id="cardTotalLabores">{{ resumen.total_labores }}</h3><p>Total labores</p></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon success"><i class="bi bi-grid-3x3-gap"></i></div>
+        <div class="stat-content"><h3 id="cardCuarteles">{{ resumen.cuarteles_intervenidos }}</h3><p>Cuarteles intervenidos</p></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon warning"><i class="bi bi-people"></i></div>
+        <div class="stat-content"><h3 id="cardResponsables">{{ resumen.responsables_activos }}</h3><p>Responsables activos</p></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon info"><i class="bi bi-calendar-check"></i></div>
+        <div class="stat-content"><h3 id="cardUltima" style="font-size:1rem; line-height:1.2;">{{ resumen.ultima_labor }}</h3><p>Última labor</p></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="users-toolbar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por predio, cuartel, tipo, subtipo o responsable" oninput="filterLabores()">
+        </div>
+        <div class="actions-cell">
+            <a class="btn btn-pdf" href="{% url 'labores_agricolas_export_pdf' %}"><i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF</a>
+            <a class="btn btn-excel" href="{% url 'labores_agricolas_export_excel' %}"><i class="bi bi-file-earmark-spreadsheet-fill"></i> Exportar Excel</a>
+            {% if can_manage %}<button type="button" class="btn btn-primary" onclick="openAddLaborModal()"><i class="bi bi-plus-circle-fill"></i> Agregar Labor</button>{% endif %}
+        </div>
+    </div>
+
+    <div class="table-responsive table-users-wrap">
+        <table class="table table-users" id="laboresTable">
+            <thead>
+                <tr>
+                    <th>Fecha</th><th>Predio</th><th>Cuartel</th><th>Tipo</th><th>Subtipo</th><th>Responsable</th><th>Estado</th>{% if can_manage %}<th>Acciones</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody id="laboresTableBody">
+                {% for labor in labores %}
+                <tr data-id="{{ labor.id }}" class="row-clickable" onclick="openRegistroDetalle('labor_agricola', {{ labor.id }})" data-search="{{ labor.predio.nombre_predio|lower }} {{ labor.cuartel.nombre_cuartel|lower }} {{ labor.tipo_labor|lower }} {{ labor.subtipo|default:''|lower }} {{ labor.responsable|default:''|lower }} {% if labor.estado %}activo{% else %}inactivo{% endif %}">
+                    <td>{{ labor.fecha|date:'d/m/Y' }}</td>
+                    <td>{{ labor.predio.nombre_predio }}</td>
+                    <td><div class="user-name">{{ labor.cuartel.nombre_cuartel }}</div></td>
+                    <td>{{ labor.get_tipo_labor_display }}</td>
+                    <td>{{ labor.subtipo|default:'-' }}</td>
+                    <td>{{ labor.responsable|default:'-' }}</td>
+                    <td>{% if labor.estado %}<span class="badge badge-success">Activo</span>{% else %}<span class="badge badge-warning">Inactivo</span>{% endif %}</td>
+                    {% if can_manage %}
+                    <td class="actions-cell" onclick="event.stopPropagation()">
+                        <button class="btn btn-sm btn-primary" type="button" onclick="editLabor({{ labor.id }})"><i class="bi bi-pencil-fill"></i> Editar</button>
+                        <button class="btn btn-sm btn-secondary" type="button" onclick="toggleLaborEstado({{ labor.id }}, {{ labor.estado|yesno:'true,false' }})"><i class="bi bi-slash-circle-fill"></i> {% if labor.estado %}Desactivar{% else %}Activar{% endif %}</button>
+                        <button class="btn btn-sm btn-danger" type="button" onclick="deleteLabor({{ labor.id }})"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr id="laboresEmptyRow"><td colspan="{% if can_manage %}8{% else %}7{% endif %}" style="text-align:center; padding:2rem; color:#7f8c8d;">No hay labores agrícolas registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if can_manage %}
+<div class="modal-overlay" id="laborModal">
+    <div class="modal" style="max-width: 860px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="bi bi-tools"></i> <span id="laborModalTitle">Agregar Labor Agrícola</span></h2>
+            <button class="modal-close" type="button" onclick="closeLaborModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="laborForm" method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" id="laborId" name="labor_id">
+                <div class="form-grid">
+                    <div class="form-group"><label class="form-label" for="predio">Predio *</label><select class="form-control" id="predio" name="predio" required onchange="onPredioChange()"><option value="">Selecciona un predio</option>{% for predio in predios_activos %}<option value="{{ predio.id }}">{{ predio.nombre_predio }}</option>{% endfor %}</select><small class="field-error" id="error-predio"></small></div>
+                    <div class="form-group"><label class="form-label" for="cuartel">Cuartel *</label><select class="form-control" id="cuartel" name="cuartel" required disabled><option value="">Selecciona primero un predio</option></select><small class="field-error" id="error-cuartel"></small></div>
+                    <div class="form-group"><label class="form-label" for="fecha">Fecha *</label><input class="form-control" type="date" id="fecha" name="fecha" required><small class="field-error" id="error-fecha"></small></div>
+                    <div class="form-group"><label class="form-label" for="tipo_labor">Tipo de labor *</label><select class="form-control" id="tipo_labor" name="tipo_labor" required onchange="onTipoLaborChange()"><option value="">Selecciona tipo</option><option value="poda">Poda</option><option value="brote">Brote</option><option value="limpieza">Limpieza</option><option value="mantencion">Mantención</option><option value="revision">Revisión</option><option value="otro">Otro</option></select><small class="field-error" id="error-tipo_labor"></small></div>
+                    <div class="form-group" id="subtipoGroup" style="display:none;"><label class="form-label" for="subtipo">Subtipo</label><select class="form-control" id="subtipo" name="subtipo"></select><small class="field-error" id="error-subtipo"></small></div>
+                    <div class="form-group" id="subtipoLibreGroup" style="display:none;"><label class="form-label" for="subtipoLibre">Subtipo</label><input class="form-control" type="text" id="subtipoLibre" placeholder="Escribe el subtipo"></div>
+                    <div class="form-group full"><label class="form-label" for="responsable">Responsable</label><input class="form-control" type="text" id="responsable" name="responsable" placeholder="Nombre del responsable"><small class="field-error" id="error-responsable"></small></div>
+                    <div class="form-group full"><label class="form-label" for="descripcion">Descripción</label><textarea class="form-control" id="descripcion" name="descripcion" rows="3" placeholder="Detalle de la labor"></textarea><small class="field-error" id="error-descripcion"></small></div>
+                    <div class="form-group full"><label class="form-label" for="observaciones">Observaciones</label><textarea class="form-control" id="observaciones" name="observaciones" rows="3" placeholder="Observaciones adicionales"></textarea><small class="field-error" id="error-observaciones"></small></div>
+                    <div class="form-group full"><label class="form-label" style="display:flex; gap:0.6rem; align-items:center;"><input type="checkbox" id="estado" name="estado" checked> Registro activo</label></div>
+                </div>
+                <div id="formError" class="alert alert-danger" style="display:none; margin-top:0.5rem;"><i class="bi bi-exclamation-triangle-fill"></i><span id="formErrorText"></span></div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" type="button" onclick="closeLaborModal()"><i class="bi bi-x-circle"></i> Cancelar</button><button class="btn btn-primary" type="button" id="saveLaborBtn" onclick="saveLabor()"><i class="bi bi-check-circle"></i> Guardar Labor</button></div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const IS_GESTION = "{{ request.resolver_match.url_name }}" === 'labores_agricolas_lista';
+const IS_ANALITICA = "{{ request.resolver_match.url_name }}" === 'labores_agricolas_analitica';
+
+function filterLabores() {
+    const term = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+    document.querySelectorAll('#laboresTableBody tr[data-search]').forEach((row) => {
+        row.style.display = row.dataset.search.includes(term) ? '' : 'none';
+    });
+}
+
+function onTipoLaborChange() {
+    const tipo = document.getElementById('tipo_labor').value;
+    const group = document.getElementById('subtipoGroup');
+    const libre = document.getElementById('subtipoLibreGroup');
+    const select = document.getElementById('subtipo');
+    const libreInput = document.getElementById('subtipoLibre');
+
+    const poda = ["Formación", "Mantención", "Renovación", "Sanitaria", "Otra"];
+    const brote = ["Temprano", "Medio", "Tardío", "Otro"];
+
+    if (tipo === 'poda' || tipo === 'brote') {
+        const opciones = tipo === 'poda' ? poda : brote;
+        select.innerHTML = '<option value="">Selecciona subtipo</option>' + opciones.map((v) => `<option value="${v}">${v}</option>`).join('');
+        group.style.display = '';
+        libre.style.display = 'none';
+        select.required = true;
+        return;
+    }
+
+    group.style.display = 'none';
+    select.required = false;
+    select.innerHTML = '';
+    libre.style.display = '';
+    libreInput.value = '';
+}
+
+async function loadCuartelesByPredio(predioId, selectedCuartelId = '') {
+    const cuartel = document.getElementById('cuartel');
+    if (!predioId) {
+        cuartel.innerHTML = '<option value="">Selecciona primero un predio</option>';
+        cuartel.disabled = true;
+        return;
+    }
+
+    const response = await fetch(`/predios/${predioId}/cuarteles/`);
+    const data = await response.json();
+    if (!data.success) return;
+
+    cuartel.innerHTML = '<option value="">Selecciona un cuartel</option>' + data.cuarteles.map((item) => {
+        const selected = String(item.id) === String(selectedCuartelId) ? 'selected' : '';
+        return `<option value="${item.id}" ${selected}>${item.nombre_cuartel}</option>`;
+    }).join('');
+    cuartel.disabled = false;
+}
+
+function onPredioChange() {
+    loadCuartelesByPredio(document.getElementById('predio').value);
+}
+
+function csrfToken() {
+    return document.querySelector('#laborForm input[name="csrfmiddlewaretoken"]').value;
+}
+
+function closeLaborModal() { closeModal('laborModal'); }
+
+function openAddLaborModal() {
+    document.getElementById('laborForm').reset();
+    document.getElementById('laborId').value = '';
+    document.getElementById('laborModalTitle').textContent = 'Agregar Labor Agrícola';
+    document.getElementById('estado').checked = true;
+    onTipoLaborChange();
+    loadCuartelesByPredio('');
+    openModal('laborModal');
+}
+
+async function editLabor(id) {
+    const response = await fetch(`/labores-agricolas/${id}/`);
+    const data = await response.json();
+    if (!data.success) return;
+
+    const l = data.labor;
+    document.getElementById('laborModalTitle').textContent = 'Editar Labor Agrícola';
+    document.getElementById('laborId').value = l.id;
+    document.getElementById('predio').value = l.predio_id || '';
+    await loadCuartelesByPredio(l.predio_id, l.cuartel_id);
+    document.getElementById('fecha').value = l.fecha_iso || '';
+    document.getElementById('tipo_labor').value = l.tipo_labor || '';
+    onTipoLaborChange();
+    if (l.tipo_labor === 'poda' || l.tipo_labor === 'brote') {
+        document.getElementById('subtipo').value = l.subtipo || '';
+    } else {
+        document.getElementById('subtipoLibre').value = l.subtipo || '';
+    }
+    document.getElementById('responsable').value = l.responsable || '';
+    document.getElementById('descripcion').value = l.descripcion || '';
+    document.getElementById('observaciones').value = l.observaciones || '';
+    document.getElementById('estado').checked = !!l.estado;
+    openModal('laborModal');
+}
+
+async function saveLabor() {
+    const form = document.getElementById('laborForm');
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+
+    const laborId = document.getElementById('laborId').value;
+    const url = laborId ? `/labores-agricolas/${laborId}/editar/` : '/labores-agricolas/crear/';
+
+    const tipo = document.getElementById('tipo_labor').value;
+    if (!(tipo === 'poda' || tipo === 'brote')) {
+        document.getElementById('subtipo').value = document.getElementById('subtipoLibre').value;
+    }
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken() },
+        body: new FormData(form),
+    });
+    const data = await response.json();
+    if (data.success) {
+        showToast(data.message || 'Labor guardada correctamente.', 'success');
+        setTimeout(() => window.location.reload(), 300);
+        return;
+    }
+    showToast(data.error || 'No se pudo guardar la labor.', 'error');
+}
+
+function deleteLabor(id) {
+    showConfirmModal(
+        'Eliminar labor agrícola',
+        'Esta acción no se puede deshacer.',
+        async () => {
+            const response = await fetch(`/labores-agricolas/${id}/eliminar/`, {
+                method: 'POST', headers: { 'X-CSRFToken': csrfToken() },
+            });
+            const data = await response.json();
+            if (data.success) { showToast(data.message || 'Eliminado correctamente.', 'success'); setTimeout(() => window.location.reload(), 300); }
+            else { showToast(data.error || 'No se pudo eliminar.', 'error'); }
+        },
+        'Eliminar',
+        'Cancelar'
+    );
+}
+
+function toggleLaborEstado(id, estadoActual) {
+    const accion = estadoActual ? 'desactivar' : 'activar';
+    showConfirmModal(
+        `${accion.charAt(0).toUpperCase() + accion.slice(1)} labor`,
+        `¿Deseas ${accion} este registro?`,
+        async () => {
+            const response = await fetch(`/labores-agricolas/${id}/toggle-estado/`, {
+                method: 'POST', headers: { 'X-CSRFToken': csrfToken() },
+            });
+            const data = await response.json();
+            if (data.success) { showToast(data.message || 'Estado actualizado.', 'success'); setTimeout(() => window.location.reload(), 300); }
+            else { showToast(data.error || 'No se pudo actualizar.', 'error'); }
+        },
+        estadoActual ? 'Desactivar' : 'Activar',
+        'Cancelar'
+    );
+}
+
+async function loadLaboresAnalytics() {
+    if (!IS_ANALITICA) return;
+
+    const params = new URLSearchParams();
+    const predio = document.getElementById('filterPredio')?.value;
+    const cuartel = document.getElementById('filterCuartel')?.value;
+    const desde = document.getElementById('filterDesde')?.value;
+    const hasta = document.getElementById('filterHasta')?.value;
+    if (predio) params.append('predio', predio);
+    if (cuartel) params.append('cuartel', cuartel);
+    if (desde) params.append('fecha_desde', desde);
+    if (hasta) params.append('fecha_hasta', hasta);
+
+    const response = await fetch(`/api/labores-agricolas/analitica/?${params.toString()}`);
+    const payload = await response.json();
+    if (!payload.success) return;
+
+    const analytics = payload.analytics || {};
+    renderLaboresCharts(analytics);
+}
+
+const chartRefs = {};
+function destroyChart(id) {
+    if (chartRefs[id]) { chartRefs[id].destroy(); chartRefs[id] = null; }
+}
+
+function renderLaboresCharts(analytics) {
+    destroyChart('laboresFrecuenciaChart');
+    chartRefs.laboresFrecuenciaChart = new Chart(document.getElementById('laboresFrecuenciaChart'), {
+        type: 'bar',
+        data: {
+            labels: analytics.frecuencia_labores?.labels || [],
+            datasets: [{ label: 'Frecuencia', data: analytics.frecuencia_labores?.series || [], borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.35)' }],
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+    });
+
+    destroyChart('laboresCuartelChart');
+    chartRefs.laboresCuartelChart = new Chart(document.getElementById('laboresCuartelChart'), {
+        type: 'bar',
+        data: {
+            labels: analytics.labores_por_cuartel?.labels || [],
+            datasets: [{ label: 'Registros', data: analytics.labores_por_cuartel?.series || [], borderColor: '#2ecc71', backgroundColor: 'rgba(46, 204, 113, 0.35)' }],
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+    });
+
+    destroyChart('laboresTemporadaChart');
+    chartRefs.laboresTemporadaChart = new Chart(document.getElementById('laboresTemporadaChart'), {
+        type: 'line',
+        data: {
+            labels: analytics.labores_por_temporada?.labels || [],
+            datasets: [{ label: 'Labores', data: analytics.labores_por_temporada?.series || [], borderColor: '#f39c12', backgroundColor: 'rgba(243, 156, 18, 0.25)', tension: 0.3, fill: true }],
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+    });
+}
+
+if (IS_GESTION) {
+    initRecordRowDetails({
+        containerSelector: '#laboresTableBody',
+        fetchUrl: (id) => `/labores-agricolas/${id}/`,
+        parseResponse: (payload) => payload.labor,
+        title: (labor) => `Detalle de labor agrícola: ${labor.cuartel_nombre || ''}`,
+        buildSections: (labor) => [
+            {
+                title: 'Labor registrada',
+                fields: [
+                    { label: 'ID', value: labor.id },
+                    { label: 'Predio', value: labor.predio_nombre },
+                    { label: 'Cuartel', value: labor.cuartel_nombre },
+                    { label: 'Tipo labor', value: labor.tipo_labor_label || labor.tipo_labor },
+                    { label: 'Subtipo', value: labor.subtipo },
+                    { label: 'Fecha', value: labor.fecha },
+                    { label: 'Responsable', value: labor.responsable },
+                    { label: 'Usuario responsable', value: labor.usuario_nombre },
+                    { label: 'Estado', value: labor.estado ? 'Activo' : 'Inactivo' },
+                ],
+            },
+            {
+                title: 'Descripción y observaciones',
+                fields: [
+                    { label: 'Descripción', value: labor.descripcion },
+                    { label: 'Observaciones', value: labor.observaciones },
+                    { label: 'Fecha creación', value: labor.created_at },
+                ],
+            },
+        ],
+    });
+
+    document.getElementById('laborModal')?.addEventListener('click', function (event) {
+        if (event.target === this) closeLaborModal();
+    });
+}
+
+if (IS_ANALITICA) {
+    document.getElementById('btnApplyFilters')?.addEventListener('click', loadLaboresAnalytics);
+    document.getElementById('btnClearFilters')?.addEventListener('click', () => {
+        document.getElementById('filterPredio').value = '';
+        document.getElementById('filterCuartel').value = '';
+        document.getElementById('filterDesde').value = '';
+        document.getElementById('filterHasta').value = '';
+        loadLaboresAnalytics();
+    });
+    loadLaboresAnalytics();
+}
+</script>
+{% endblock %}

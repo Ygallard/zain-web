@@ -10,18 +10,20 @@ const templates = {
                     <p class="mt-3">Cargando datos por favor espere...</p>
                 </div>
             </div>
-            <div class="top-dashboard">
-                <div class="card" id="flujometro">
-                    <h3>Flujometro</h3>
-                    <div class="card-content"></div>
-                </div>
+            <div class="dashboard-layout">
                 <div class="card" id="tiempo">
                     <h3>Tiempo Actual</h3>
                     <div class="card-content"></div>
                 </div>
-                <div class="card" id="visitas">
-                    <h3>Visitas Totales</h3>
-                    <div class="card-content"></div>
+                <div class="dashboard-summary-row">
+                    <div class="card" id="flujometro">
+                        <h3>Flujometro</h3>
+                        <div class="card-content"></div>
+                    </div>
+                    <div class="card" id="visitas">
+                        <h3>Visitas Totales</h3>
+                        <div class="card-content"></div>
+                    </div>
                 </div>
             </div>
             <div class="bottom-dashboard">
@@ -188,10 +190,127 @@ const appState = {
         flow: false
     },
     realtimeInterval: null,  // Para almacenar el intervalo de actualización
+    weatherRefreshInterval: null,
+    weatherRequestInProgress: false,
     flowHistory: [],  // Para almacenar el historial de datos
     lastFlowData: null,  // Cache del último dato recibido
     requestInProgress: false  // Flag para evitar peticiones simultáneas
 };
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"]'/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[char]));
+}
+
+function formatWeatherValue(value, digits = 1) {
+    if (value === null || value === undefined || value === '') {
+        return '--';
+    }
+
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) {
+        return escapeHtml(value);
+    }
+
+    return numeric.toFixed(digits);
+}
+
+function renderWeatherUnavailable(message) {
+    return `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:220px; padding:20px; text-align:center;">
+            <div style="font-size:3.5rem; color:#dc3545; line-height:1;"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <div style="margin-top:14px; font-size:1rem; color:#7f8c8d; font-weight:600;">${escapeHtml(message || 'Centro meteorológico no disponible.')}</div>
+        </div>
+    `;
+}
+
+function renderWeatherCard(data) {
+    const status = data.status || 'Estable';
+    const condition = String(status).toLowerCase();
+    let iconClass = 'bi-cloud-sun-fill';
+
+    if (condition.includes('lluv')) {
+        iconClass = 'bi-cloud-rain-fill';
+    } else if (condition.includes('inest')) {
+        iconClass = 'bi-cloud-lightning-rain-fill';
+    } else if (condition.includes('cal') || condition.includes('cál') || condition.includes('despej')) {
+        iconClass = 'bi-sun-fill';
+    }
+
+    const updatedText = escapeHtml(data.updated_at_text || data.updated_at || 'No disponible');
+
+    return `
+        <div class="weather-card-layout">
+            <div class="weather-primary">
+                <div class="weather-icon">
+                    <i class="bi ${iconClass}"></i>
+                </div>
+                <div class="weather-condition">
+                    <div class="weather-label">Estado del clima</div>
+                    <div class="weather-status">${escapeHtml(status)}</div>
+                </div>
+                <div class="weather-temperature">
+                    <div class="weather-label">Temperatura</div>
+                    <div class="weather-temperature-value">${formatWeatherValue(data.temperature, 1)}<span>°C</span></div>
+                </div>
+            </div>
+
+            <div class="weather-metrics">
+                <div class="weather-metric">
+                    <div class="weather-label">Humedad</div>
+                    <div class="weather-metric-value">${formatWeatherValue(data.humidity, 0)}%</div>
+                </div>
+                <div class="weather-metric">
+                    <div class="weather-label">Viento</div>
+                    <div class="weather-metric-value">${formatWeatherValue(data.wind_speed, 1)} km/h</div>
+                </div>
+                <div class="weather-metric">
+                    <div class="weather-label">Dirección</div>
+                    <div class="weather-metric-value">${escapeHtml(data.wind_direction || '--')}</div>
+                </div>
+                <div class="weather-metric">
+                    <div class="weather-label">Lluvia</div>
+                    <div class="weather-metric-value">${formatWeatherValue(data.rain_day, 1)} mm</div>
+                </div>
+                <div class="weather-metric">
+                    <div class="weather-label">Sensación</div>
+                    <div class="weather-metric-value">${formatWeatherValue(data.feels_like, 1)}°C</div>
+                </div>
+                <div class="weather-metric">
+                    <div class="weather-label">Presión</div>
+                    <div class="weather-metric-value">${formatWeatherValue(data.pressure, 1)} hPa</div>
+                </div>
+                <div class="weather-metric">
+                    <div class="weather-label">Índice UV</div>
+                    <div class="weather-metric-value">${formatWeatherValue(data.uv, 1)}</div>
+                </div>
+            </div>
+
+            <div class="weather-updated"><i class="bi bi-clock-history"></i> Última actualización: ${updatedText}</div>
+        </div>
+    `;
+}
+
+function stopWeatherAutoRefresh() {
+    if (appState.weatherRefreshInterval) {
+        clearInterval(appState.weatherRefreshInterval);
+        appState.weatherRefreshInterval = null;
+    }
+}
+
+function startWeatherAutoRefresh() {
+    stopWeatherAutoRefresh();
+    appState.weatherRefreshInterval = setInterval(() => {
+        if (appState.currentView === 'inicio') {
+            loadWeatherData();
+        }
+    }, 60 * 1000);  // Actualizar cada 60 segundos
+}
 
 function renderAuthRequiredView() {
     return `
@@ -463,6 +582,7 @@ async function loadView(viewName) {
         // Detener el monitoreo en tiempo real si estamos saliendo de la vista de inicio
         if (appState.currentView === 'inicio' && viewName !== 'inicio') {
             stopRealtimeFlowMonitor();
+            stopWeatherAutoRefresh();
         }
         
         // Mostrar overlay principal si existe
@@ -547,6 +667,7 @@ async function initializeHomeView() {
         
         // Iniciar el medidor en tiempo real después de cargar los datos iniciales
         startRealtimeFlowMonitor();
+        startWeatherAutoRefresh();
         
     } catch (error) {
         console.error("Error al inicializar la vista de inicio:", error);
@@ -1504,44 +1625,26 @@ $(document).ready(function() {
 
 
 async function loadWeatherData() {
+    if (appState.weatherRequestInProgress) {
+        return;
+    }
+
+    appState.weatherRequestInProgress = true;
     try {
-        const response = await fetch('/api/weather');
-        const data = await response.json();
+        const response = await fetch('/api/weather/current/');
+        const payload = await response.json();
 
-        if (data && response.ok) {
-            const Tiempo = document.getElementById('tiempo');
-
-            let weatherHtml = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px;">';
-            
-            // Determinar el estado del tiempo según la presión atmosférica
-            if (data.bar) {
-                const presion = data.bar;
-                if (presion < 1000) {
-                    weatherHtml += '<div style="font-size: 4.5em; margin-bottom: 15px;"><i class="bi bi-cloud-rain-fill text-info"></i></div>';
-                } else if (presion > 1020) {
-                    weatherHtml += '<div style="font-size: 4.5em; margin-bottom: 15px;"><i class="bi bi-sun-fill text-warning"></i></div>';
-                } else {
-                    weatherHtml += '<div style="font-size: 4.5em; margin-bottom: 15px;"><i class="bi bi-cloud-sun-fill text-primary"></i></div>';
-                }
-            }
-
-            // Añadir la sensación térmica
-            const computed = data.computed;
-            const temperature = computed && computed.feel !== null ? computed.feel : '-';
-            weatherHtml += `<div style="font-size: 3em; font-weight: 700; color: #2c3e50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${temperature}°C</div>`;
-            weatherHtml += '</div>';
-
-            $("#tiempo .card-content").html(weatherHtml);
+        if (response.ok && payload.success && payload.data) {
+            $("#tiempo .card-content").html(renderWeatherCard(payload.data));
+        } else {
+            const message = payload?.error || payload?.message || 'Centro meteorológico no disponible.';
+            $("#tiempo .card-content").html(renderWeatherUnavailable(message));
         }
     } catch (error) {
         console.error('Error al cargar los datos meteorológicos:', error);
-        $("#tiempo .card-content").html(
-            `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px;">
-                <div style="font-size: 3.5em; color: #dc3545;"><i class="bi bi-exclamation-triangle-fill"></i></div>
-                <div style="margin-top: 15px; font-size: 1em; color: #7f8c8d; text-align: center;">Error al cargar<br>datos del clima</div>
-            </div>`
-        );
+        $("#tiempo .card-content").html(renderWeatherUnavailable('Centro meteorológico no disponible.'));
     } finally {
+        appState.weatherRequestInProgress = false;
         appState.loadingStates.weather = true;
         checkAllLoaded();
     }

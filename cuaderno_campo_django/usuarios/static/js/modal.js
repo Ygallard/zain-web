@@ -361,6 +361,249 @@ function validatePhone(phone) {
     return phoneRegex.test(phone.replace(/[^\d+]/g, ''));
 }
 
+function escapeDetailHTML(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function normalizeDetailValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    if (Array.isArray(value)) {
+        return value.length ? value.join(', ') : '-';
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Si' : 'No';
+    }
+
+    return value;
+}
+
+function inferDetailTheme(title) {
+    const text = String(title || '').toLowerCase();
+    if (text.includes('riego')) return { icon: 'bi-droplet-half', theme: 'detail-theme-water' };
+    if (text.includes('cosecha')) return { icon: 'bi-basket2-fill', theme: 'detail-theme-harvest' };
+    if (text.includes('fertiliz')) return { icon: 'bi-flower2', theme: 'detail-theme-fertilizer' };
+    if (text.includes('quimic')) return { icon: 'bi-bezier2', theme: 'detail-theme-chem' };
+    if (text.includes('predio')) return { icon: 'bi-geo-alt-fill', theme: 'detail-theme-land' };
+    if (text.includes('cuartel')) return { icon: 'bi-grid-3x3-gap-fill', theme: 'detail-theme-land' };
+    if (text.includes('labor') || text.includes('poda') || text.includes('brote')) return { icon: 'bi-tools', theme: 'detail-theme-agro' };
+    if (text.includes('usuario')) return { icon: 'bi-person-badge-fill', theme: 'detail-theme-user' };
+    if (text.includes('auditor')) return { icon: 'bi-shield-check', theme: 'detail-theme-audit' };
+    return { icon: 'bi-card-list', theme: 'detail-theme-agro' };
+}
+
+function inferSectionIcon(sectionTitle) {
+    const text = String(sectionTitle || '').toLowerCase();
+    if (text.includes('general')) return 'bi-info-circle-fill';
+    if (text.includes('agric')) return 'bi-tree-fill';
+    if (text.includes('observ')) return 'bi-chat-left-text-fill';
+    if (text.includes('fecha') || text.includes('trazabilidad') || text.includes('auditor')) return 'bi-clock-history';
+    if (text.includes('ident')) return 'bi-patch-check-fill';
+    if (text.includes('aplic')) return 'bi-droplet-fill';
+    return 'bi-dot';
+}
+
+function getStatusBadge(value) {
+    const text = String(value || '').trim();
+    const normalized = text.toLowerCase();
+    let badgeClass = '';
+
+    if (['activo', 'activa', 'si', 'sí', 'habilitado', 'vigente'].includes(normalized)) {
+        badgeClass = 'detail-badge-success';
+    } else if (['inactivo', 'inactiva', 'no', 'deshabilitado', 'eliminado'].includes(normalized)) {
+        badgeClass = 'detail-badge-danger';
+    } else if (['pendiente', 'en proceso', 'borrador', 'regular'].includes(normalized)) {
+        badgeClass = 'detail-badge-warning';
+    }
+
+    if (!badgeClass) {
+        return '';
+    }
+
+    return `<span class="detail-badge ${badgeClass}">${escapeDetailHTML(text)}</span>`;
+}
+
+function ensureRecordDetailModal() {
+    let modal = document.getElementById('recordDetailModal');
+    if (modal) {
+        return modal;
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'recordDetailModal';
+    modal.className = 'modal-overlay detail-modal-overlay';
+    modal.innerHTML = `
+        <div class="modal detail-modal detail-theme-agro" role="dialog" aria-modal="true" aria-labelledby="recordDetailTitle">
+            <div class="modal-header detail-modal-header">
+                <div class="detail-modal-title-wrap">
+                    <div class="detail-modal-title-line">
+                        <span class="detail-modal-icon" id="recordDetailIcon"><i class="bi bi-card-list"></i></span>
+                        <h2 class="modal-title" id="recordDetailTitle">Detalle del registro</h2>
+                    </div>
+                    <p class="detail-modal-subtitle">Información completa del registro seleccionado.</p>
+                </div>
+                <button class="modal-close" type="button" aria-label="Cerrar detalle">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body detail-modal-body" id="recordDetailContent"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" id="recordDetailCloseBtn">
+                    <i class="bi bi-x-circle"></i> Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    const close = () => closeModal('recordDetailModal');
+    modal.querySelector('.modal-close').addEventListener('click', close);
+    modal.querySelector('#recordDetailCloseBtn').addEventListener('click', close);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            close();
+        }
+    });
+
+    document.body.appendChild(modal);
+    return modal;
+}
+
+function openRecordDetailModal(title, sections) {
+    ensureRecordDetailModal();
+
+    const titleEl = document.getElementById('recordDetailTitle');
+    const iconEl = document.getElementById('recordDetailIcon');
+    const subtitleEl = document.querySelector('#recordDetailModal .detail-modal-subtitle');
+    const contentEl = document.getElementById('recordDetailContent');
+    if (!titleEl || !contentEl) {
+        return;
+    }
+
+    const resolvedTitle = title || 'Detalle del registro';
+    const inferredTheme = inferDetailTheme(resolvedTitle);
+    const modalEl = document.querySelector('#recordDetailModal .detail-modal');
+    if (modalEl) {
+        modalEl.className = `modal detail-modal ${inferredTheme.theme}`;
+    }
+
+    titleEl.textContent = resolvedTitle;
+    if (iconEl) {
+        iconEl.innerHTML = `<i class="bi ${inferredTheme.icon}"></i>`;
+    }
+    if (subtitleEl) {
+        subtitleEl.textContent = 'Información completa del registro seleccionado.';
+    }
+
+    const sectionsMarkup = (sections || []).map((section) => {
+        const sectionIcon = section.icon || inferSectionIcon(section.title);
+        const fields = (section.fields || []).map((field) => {
+            const normalized = normalizeDetailValue(field.value);
+            const value = escapeDetailHTML(normalized);
+            const isEmptyValue = normalized === '-';
+            const isWide = String(normalized).length > 70;
+            const badge = getStatusBadge(normalized);
+            return `
+                <div class="detail-row ${isWide ? 'detail-row-full' : ''}">
+                    <div class="detail-cell detail-cell-label">${escapeDetailHTML(field.label)}</div>
+                    <div class="detail-cell detail-cell-value">
+                        <span class="detail-value ${isEmptyValue ? 'detail-value-empty' : ''}">${badge || value}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <section class="detail-section-card">
+                <h3 class="detail-section-title">
+                    <i class="bi ${sectionIcon}"></i>
+                    <span>${escapeDetailHTML(section.title || 'Información')}</span>
+                </h3>
+                <div class="detail-rows">${fields}</div>
+            </section>
+        `;
+    }).join('');
+
+    contentEl.innerHTML = sectionsMarkup || '<p class="detail-empty">Sin información disponible para este registro.</p>';
+    openModal('recordDetailModal');
+}
+
+function initRecordRowDetails(config) {
+    const {
+        containerSelector,
+        rowSelector = 'tr[data-id]',
+        fetchUrl,
+        parseResponse,
+        title,
+        buildSections,
+    } = config || {};
+
+    if (!containerSelector || typeof fetchUrl !== 'function' || typeof parseResponse !== 'function' || typeof buildSections !== 'function') {
+        return;
+    }
+
+    const container = document.querySelector(containerSelector);
+    if (!container || container.dataset.detailsBound === 'true') {
+        return;
+    }
+
+    const refreshRows = () => {
+        container.querySelectorAll(rowSelector).forEach((row) => {
+            if (row.dataset.id) {
+                row.classList.add('js-row-detail');
+            }
+        });
+    };
+
+    refreshRows();
+
+    const observer = new MutationObserver(refreshRows);
+    observer.observe(container, { childList: true, subtree: true });
+
+    container.addEventListener('click', async (event) => {
+        const row = event.target.closest(rowSelector);
+        if (!row || !container.contains(row)) {
+            return;
+        }
+
+        if (event.target.closest('button, a, input, select, textarea, label, .actions-cell, [data-no-row-detail]')) {
+            return;
+        }
+
+        const id = row.dataset.id;
+        if (!id) {
+            return;
+        }
+
+        row.classList.add('row-detail-loading');
+
+        try {
+            const response = await fetch(fetchUrl(id));
+            const payload = await response.json();
+            if (!payload.success) {
+                throw new Error(payload.error || 'No fue posible cargar el detalle.');
+            }
+
+            const record = parseResponse(payload);
+            const sections = buildSections(record || {});
+            openRecordDetailModal(typeof title === 'function' ? title(record || {}) : title, sections);
+        } catch (error) {
+            showToast(error.message || 'No fue posible abrir el detalle del registro.', 'error');
+        } finally {
+            row.classList.remove('row-detail-loading');
+        }
+    });
+
+    container.dataset.detailsBound = 'true';
+}
+
 // Inicialización al cargar el documento
 document.addEventListener('DOMContentLoaded', function() {
     // Cerrar modales al presionar ESC

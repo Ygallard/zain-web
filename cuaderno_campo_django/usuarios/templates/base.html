@@ -6,8 +6,51 @@
     <title>{% block title %}Cuaderno de Campo Digital{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/base.css' %}?v=20260518-responsive-global">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}?v=20260519-detail-premium-v2">
     {% block extra_css %}{% endblock %}
+    <style>
+        .notif-bell-trigger {
+            position: relative;
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: 1.35rem;
+            cursor: pointer;
+            padding: 0.4rem 0.6rem;
+            margin-right: 0.75rem;
+        }
+        .notif-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background: #e74c3c;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            border-radius: 999px;
+            min-width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+        .notif-panel-item {
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            padding: 0.75rem 0.25rem;
+            cursor: pointer;
+        }
+        .notif-panel-item:last-child { border-bottom: none; }
+        .notif-panel-item.unread { background: rgba(52,152,219,0.06); }
+        .notif-panel-item .notif-title { font-weight: 700; color: #2c3e50; }
+        .notif-panel-item .notif-meta { font-size: 0.78rem; color: #7f8c8d; margin-top: 0.2rem; }
+        .registro-detalle-table td { padding: 0.5rem 0.75rem; vertical-align: top; }
+        .registro-detalle-table td:first-child { font-weight: 700; color: #2c3e50; width: 40%; background: rgba(52,152,219,0.06); }
+        .comentario-item { border-left: 3px solid #3498db; padding: 0.6rem 0.85rem; margin-bottom: 0.6rem; background: rgba(52,152,219,0.05); border-radius: 6px; }
+        .comentario-item .comentario-meta { font-size: 0.78rem; color: #7f8c8d; margin-bottom: 0.25rem; }
+        .row-clickable { cursor: pointer; }
+        .row-clickable:hover { background: rgba(52,152,219,0.06); }
+    </style>
 </head>
 <body>
     <div class="main-container">
@@ -22,6 +65,14 @@
             </div>
             <div class="navbar-user">
                 {% if current_user %}
+                    <button class="notif-bell-trigger" type="button" id="notifBellButton" aria-haspopup="true" aria-expanded="false" title="Notificaciones">
+                        <i class="bi bi-bell-fill"></i>
+                        {% if sidebar_context.notificaciones_no_leidas %}
+                            <span class="notif-badge" id="notifBadge">{{ sidebar_context.notificaciones_no_leidas }}</span>
+                        {% else %}
+                            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+                        {% endif %}
+                    </button>
                     <div class="user-dropdown" id="userDropdown">
                         <button class="user-trigger" type="button" id="userMenuButton" aria-haspopup="true" aria-expanded="false">
                             <span class="avatar"><i class="bi bi-person-circle"></i></span>
@@ -31,7 +82,7 @@
                                     {% if current_user.rol == 'admin' %}
                                         Administrador
                                     {% elif current_user.rol == 'tecnico' %}
-                                        Técnico
+                                        PRODESAL
                                     {% else %}
                                         Productor
                                     {% endif %}
@@ -40,14 +91,6 @@
                             <i class="bi bi-chevron-down user-chevron"></i>
                         </button>
                         <div class="user-menu" id="userMenu" role="menu" aria-labelledby="userMenuButton">
-                            <button class="user-menu-item" type="button" onclick="alert('Mi perfil estará disponible próximamente.')">
-                                <i class="bi bi-person-lines-fill"></i>
-                                Mi perfil
-                            </button>
-                            <button class="user-menu-item" type="button" onclick="alert('Configuración estará disponible próximamente.')">
-                                <i class="bi bi-gear"></i>
-                                Configuración
-                            </button>
                             <a href="{% url 'logout' %}" class="user-menu-item danger" role="menuitem">
                                 <i class="bi bi-box-arrow-right"></i>
                                 Cerrar sesión
@@ -57,6 +100,7 @@
                 {% endif %}
             </div>
         </nav>
+
 
         <!-- CONTENIDO PRINCIPAL -->
         <div class="content-wrapper" id="contentWrapper">
@@ -73,6 +117,13 @@
                     {% if 'usuarios_lista' in sidebar_context.sidebar_items %}
                         <li><a href="{% url 'usuarios_lista' %}" class="{% if request.resolver_match.url_name == 'usuarios_lista' %}active{% endif %}">
                             <i class="bi bi-people-fill"></i> Gestión Usuarios
+                        </a></li>
+                    {% endif %}
+
+                    <!-- Productores (Solo PRODESAL, solo lectura) -->
+                    {% if 'productores_lista' in sidebar_context.sidebar_items %}
+                        <li><a href="{% url 'productores_lista' %}" class="{% if request.resolver_match.url_name == 'productores_lista' %}active{% endif %}">
+                            <i class="bi bi-people-fill"></i> Productores
                         </a></li>
                     {% endif %}
 
@@ -170,6 +221,25 @@
                         </li>
                     {% endif %}
 
+                    {% if 'labores_agricolas_lista' in sidebar_context.sidebar_items %}
+                        <li class="sidebar-group collapsible-group {% if request.resolver_match.url_name == 'labores_agricolas_lista' or request.resolver_match.url_name == 'labores_agricolas_analitica' %}is-current{% endif %}" data-group-key="labores_agricolas">
+                            <button class="sidebar-group-toggle" type="button" aria-expanded="false">
+                                <span class="group-main">
+                                    <i class="bi bi-tools"></i> Labores Agrícolas
+                                </span>
+                                <span class="group-arrow" aria-hidden="true">▶</span>
+                            </button>
+                            <ul class="sidebar-subnav">
+                                <li><a href="{% url 'labores_agricolas_lista' %}" class="{% if request.resolver_match.url_name == 'labores_agricolas_lista' %}active{% endif %}">
+                                    <i class="bi bi-sliders"></i> Gestion
+                                </a></li>
+                                <li><a href="{% url 'labores_agricolas_analitica' %}" class="{% if request.resolver_match.url_name == 'labores_agricolas_analitica' %}active{% endif %}">
+                                    <i class="bi bi-graph-up-arrow"></i> Analitica
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% endif %}
+
                     {% if 'auditoria_logs' in sidebar_context.sidebar_items %}
                         <li><a href="{% url 'auditoria_logs' %}" class="{% if request.resolver_match.url_name == 'auditoria_logs' %}active{% endif %}">
                             <i class="bi bi-shield-check"></i> Auditoría
@@ -213,9 +283,93 @@
         </footer>
     </div>
 
+    <!-- MODAL: NOTIFICACIONES -->
+    <div class="modal-overlay" id="notifModal">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="bi bi-bell-fill"></i> Notificaciones</h2>
+                <button class="modal-close" type="button" onclick="closeModal('notifModal')"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="notifListContainer">
+                    <p style="text-align:center; color:#7f8c8d;">Cargando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE DE REGISTRO + OBSERVACIONES TÉCNICAS -->
+    <div class="modal-overlay" id="registroDetalleModal">
+        <div class="modal" style="max-width: 720px;">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="bi bi-file-earmark-text-fill"></i> <span id="registroDetalleTitulo">Detalle del registro</span></h2>
+                <button class="modal-close" type="button" onclick="closeModal('registroDetalleModal')"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="modal-body">
+                <table class="table registro-detalle-table" id="registroDetalleTabla"></table>
+
+                <h3><i class="bi bi-person-badge-fill"></i> Responsable del registro</h3>
+                <table class="table registro-detalle-table" id="registroDetalleResponsable"></table>
+
+                <h3><i class="bi bi-geo-alt-fill"></i> Ubicación</h3>
+                <div id="registroDetalleUbicacion"></div>
+
+                <hr>
+                <h3><i class="bi bi-chat-left-text-fill"></i> Observaciones técnicas</h3>
+                <div id="registroDetalleComentarios"><p style="color:#7f8c8d;">Cargando observaciones...</p></div>
+
+                <div id="registroDetalleComentarioForm" style="display:none; margin-top: 1rem;">
+                    <textarea class="form-control" id="registroDetalleComentarioTexto" rows="3" placeholder="Escribe una observación técnica para el productor..."></textarea>
+                    <div style="display:flex; gap:0.6rem; margin-top: 0.6rem; flex-wrap: wrap;">
+                        <button class="btn btn-primary" type="button" onclick="enviarComentarioRegistro()">
+                            <i class="bi bi-send-fill"></i> Enviar observación
+                        </button>
+                        <button class="btn btn-secondary" type="button" id="registroDetalleNotificarBtn" onclick="abrirNotificarSobreRegistro()" style="display:none;">
+                            <i class="bi bi-bell-fill"></i> Notificar sobre este registro
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NOTIFICAR SOBRE UN REGISTRO -->
+    <div class="modal-overlay" id="notificarRegistroModal">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="bi bi-bell-fill"></i> Notificar sobre este registro</h2>
+                <button class="modal-close" type="button" onclick="closeModal('notificarRegistroModal')"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>Destinatario: <strong id="notificarRegistroProductorNombre"></strong></p>
+                <div class="form-group">
+                    <label class="form-label" for="notificarRegistroTitulo">Título *</label>
+                    <input class="form-control" type="text" id="notificarRegistroTitulo" placeholder="Ej: Revisar registro de cosecha">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="notificarRegistroMensaje">Mensaje *</label>
+                    <textarea class="form-control" id="notificarRegistroMensaje" rows="4" placeholder="Detalle de la recomendación u observación"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeModal('notificarRegistroModal')"><i class="bi bi-x-circle"></i> Cancelar</button>
+                <button class="btn btn-primary" type="button" onclick="enviarNotificacionSobreRegistro()"><i class="bi bi-send-fill"></i> Enviar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPTS -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="{% static 'js/modal.js' %}"></script>
+    <script src="{% static 'js/modal.js' %}?v=20260519-detail-premium-v1"></script>
+    <script src="{% static 'js/colaboracion.js' %}?v=20260822-v1"></script>
+    <script>
+        window.ZAINO_CTX = {
+            rol: "{{ sidebar_context.rol|default:'' }}",
+            canComment: {{ sidebar_context.can_comment|yesno:'true,false' }},
+            canSendNotifications: {{ sidebar_context.can_send_notifications|yesno:'true,false' }},
+            csrfToken: "{{ csrf_token }}"
+        };
+    </script>
     <script>
         (function () {
             const dropdown = document.getElementById('userDropdown');
