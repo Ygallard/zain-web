@@ -13,8 +13,8 @@ settings = config.load_config()
 
 # URL del servidor Django para autenticación centralizada
 # En Django estas rutas se publican en /api/auth/*
-DJANGO_AUTH_API = "http://127.0.0.1:8000/api/auth"
-DJANGO_BASE_URL = "http://127.0.0.1:8000"
+DJANGO_BASE_URL = os.getenv("DJANGO_BASE_URL", "http://127.0.0.1:8000")
+DJANGO_AUTH_API = f"{DJANGO_BASE_URL}/api/auth"
 DJANGO_WEATHER_CURRENT_API = f"{DJANGO_BASE_URL}/api/weather/current/"
 
 
@@ -53,9 +53,9 @@ def post_activity_log(modulo, accion, descripcion):
 def build_cuaderno_sso_url(token):
     """Construye URL de SSO para abrir Cuaderno con la identidad actual."""
     if not token:
-        return "http://127.0.0.1:8000/dashboard/"
+        return f"{DJANGO_BASE_URL}/dashboard/"
     next_path = quote('/dashboard/', safe='')
-    return f"http://127.0.0.1:8000/api/auth/sso/?token={token}&next={next_path}"
+    return f"{DJANGO_BASE_URL}/api/auth/sso/?token={token}&next={next_path}"
 
 
 def get_django_dashboard_stats(token):
