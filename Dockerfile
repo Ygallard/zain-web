@@ -1,31 +1,20 @@
-# Use official Python base image
+# Django deployment image. The repository root is the build context in UrraHosting.
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install curl
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY cuaderno_campo_django/requirements.txt ./requirements.txt
 
-# Copy dependency files
-COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+COPY cuaderno_campo_django/ ./
 
-# Copy the rest of the application
-COPY . .
-
-# Create the application user and grant it access to all project files.
 RUN groupadd --gid 10001 appuser \
 	&& useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin appuser \
 	&& chown -R 10001:10001 /app
 
-# Expose port
-EXPOSE 5000
+EXPOSE 8000
 
-# Run the application without root privileges.
 USER 10001:10001
 
-# Command to run the app
-CMD ["python", "app.py"]
+CMD ["sh", "-c", "gunicorn cuaderno_campo_django.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
