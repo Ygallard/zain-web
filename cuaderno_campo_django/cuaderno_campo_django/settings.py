@@ -25,7 +25,9 @@ WEATHERCLOUD_EMAIL = os.getenv("WEATHERCLOUD_EMAIL", "")
 WEATHERCLOUD_PASSWORD = os.getenv("WEATHERCLOUD_PASSWORD", "")
 WEATHERCLOUD_DEVICEID = os.getenv("WEATHERCLOUD_DEVICEID", "d5189955137")
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
+# Configuración de Hosts permitidos (acepta variables de entorno o '*' por defecto para PaaS)
+raw_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(",") if h.strip()]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -101,13 +103,10 @@ CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_AGE = int(os.getenv("DJANGO_SESSION_COOKIE_AGE", "43200"))
 SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv("DJANGO_SESSION_EXPIRE_AT_BROWSER_CLOSE", "True").lower() == "true"
 
-# Permitir iframes desde localhost (para integración con Flask)
+# Permitir iframes (para integración con Flask)
 X_FRAME_OPTIONS = 'ALLOWALL'
 
-# Confiar en solicitudes CSRF desde Flask
-CSRF_TRUSTED_ORIGINS = [
-    'http://127.0.0.1:5000',
-    'http://localhost:5000',
-    'http://192.168.1.8:5000',
-]
+# Confiar en solicitudes CSRF desde entorno local y subdominios de UrraHosting
+raw_csrf = os.getenv("CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:5000,http://localhost:5000,https://*.urrahosting.com")
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in raw_csrf.split(",") if origin.strip()]
 
