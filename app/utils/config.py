@@ -1,23 +1,38 @@
-import os, json
+import json
+import os
 
 from filelock import FileLock
 from dotenv import load_dotenv
 
+
+def get_visitas_path():
+    visitas_path = os.path.abspath(
+        os.path.expanduser(os.getenv("VISITAS_DATA_PATH", "/tmp/visitas.json"))
+    )
+    os.makedirs(os.path.dirname(visitas_path), exist_ok=True)
+    return visitas_path
+
+
+def get_informes_dir():
+    informes_dir = os.path.abspath(
+        os.path.expanduser(os.getenv("INFORMES_DATA_DIR", "/tmp/informes"))
+    )
+    os.makedirs(informes_dir, exist_ok=True)
+    return informes_dir
+
+
 def load_config():
 
     load_dotenv()
-    
-    # Generar SECRET_KEY si no existe en .env
+
     secret_key = os.getenv("SECRET_KEY")
     if not secret_key:
-        # Generar una clave aleatoria de 24 bytes
-        secret_key = os.urandom(24).hex()
-        print("⚠️ WARNING: SECRET_KEY no encontrada en .env. Generando una aleatoria.")
-        print(f"   Para producción, agrega esta línea a tu .env: SECRET_KEY={secret_key}")
-    
+        raise RuntimeError(
+            "SECRET_KEY must be set through an environment variable before starting the application."
+        )
+
     # Manejar el contador de visitas
-    visitas_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../visitas.json')
-    visitas_path = os.path.normpath(visitas_path)
+    visitas_path = get_visitas_path()
 
     if not os.path.exists(visitas_path):
         with open(visitas_path, 'w') as f:
@@ -45,8 +60,7 @@ def get_port():
     return int(os.getenv("PORT", 5000))
 
 def incrementar_visitas():
-    visitas_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../visitas.json')
-    visitas_path = os.path.normpath(visitas_path)
+    visitas_path = get_visitas_path()
     lock_path = visitas_path + '.lock'
     lock = FileLock(lock_path, timeout=10)  # Espera hasta 10 segundos por el lock
 

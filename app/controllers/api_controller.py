@@ -493,13 +493,8 @@ def get_informes():
     """Obtiene la lista de informes disponibles"""
     import os
     from datetime import datetime
-    
-    # Crear directorio de informes si no existe
-    informes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../informes')
-    informes_dir = os.path.normpath(informes_dir)
-    
-    if not os.path.exists(informes_dir):
-        os.makedirs(informes_dir)
+
+    informes_dir = config.get_informes_dir()
     
     # Listar archivos de informes
     informes = []
@@ -545,12 +540,7 @@ def generar_informe():
     import calendar
     
     try:
-        # Crear directorio de informes si no existe
-        informes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../informes')
-        informes_dir = os.path.normpath(informes_dir)
-        
-        if not os.path.exists(informes_dir):
-            os.makedirs(informes_dir)
+        informes_dir = config.get_informes_dir()
         
         # VALIDAR: Verificar si ya existe un informe del mes actual
         fecha_actual = datetime.now()
@@ -684,8 +674,7 @@ def get_informe(informe_id):
     import json
     
     try:
-        informes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../informes')
-        informes_dir = os.path.normpath(informes_dir)
+        informes_dir = config.get_informes_dir()
         
         filepath = os.path.join(informes_dir, f"{informe_id}.json")
         
@@ -715,8 +704,7 @@ def delete_informe(informe_id):
     import os
     
     try:
-        informes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../informes')
-        informes_dir = os.path.normpath(informes_dir)
+        informes_dir = config.get_informes_dir()
         
         filepath = os.path.join(informes_dir, f"{informe_id}.json")
         
