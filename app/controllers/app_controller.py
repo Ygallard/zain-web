@@ -11,3 +11,8 @@ from datetime import datetime
 @app.route("/")
 def index():
     return page("app.html")
+
+
+@app.route("/health")
+def health():
+    return "OK", 200
