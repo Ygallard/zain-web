@@ -6,16 +6,24 @@ from app.utils import config
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 from datetime import datetime, timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 settings = config.load_config()
 
 
-# URL del servidor Django para autenticación centralizada
-# En Django estas rutas se publican en /api/auth/*
-DJANGO_BASE_URL = os.getenv("DJANGO_BASE_URL", "http://127.0.0.1:8000")
-DJANGO_AUTH_API = f"{DJANGO_BASE_URL}/api/auth"
-DJANGO_WEATHER_CURRENT_API = f"{DJANGO_BASE_URL}/api/weather/current/"
+# URL pública o interna del servidor Django. Debe inyectarse en el entorno de Flask.
+DJANGO_BACKEND_URL = os.getenv("DJANGO_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+parsed_django_url = urlparse(DJANGO_BACKEND_URL)
+if (
+    parsed_django_url.scheme not in {"http", "https"}
+    or not parsed_django_url.netloc
+    or parsed_django_url.netloc == "tu-dominio-backend.com"
+):
+    raise RuntimeError("DJANGO_BACKEND_URL debe ser una URL HTTP(S) válida del backend Django.")
+
+# En Django estas rutas se publican en /api/auth/*.
+DJANGO_AUTH_API = f"{DJANGO_BACKEND_URL}/api/auth"
+DJANGO_WEATHER_CURRENT_API = f"{DJANGO_BACKEND_URL}/api/weather/current/"
 
 
 def is_authenticated():
@@ -53,9 +61,9 @@ def post_activity_log(modulo, accion, descripcion):
 def build_cuaderno_sso_url(token):
     """Construye URL de SSO para abrir Cuaderno con la identidad actual."""
     if not token:
-        return f"{DJANGO_BASE_URL}/dashboard/"
+        return f"{DJANGO_BACKEND_URL}/dashboard/"
     next_path = quote('/dashboard/', safe='')
-    return f"{DJANGO_BASE_URL}/api/auth/sso/?token={token}&next={next_path}"
+    return f"{DJANGO_BACKEND_URL}/api/auth/sso/?token={token}&next={next_path}"
 
 
 def get_django_dashboard_stats(token):
@@ -63,8 +71,8 @@ def get_django_dashboard_stats(token):
     if not token:
         return None, "Token de autenticacion no disponible"
 
-    sso_url = f"{DJANGO_BASE_URL}/api/auth/sso/?token={quote(token, safe='')}&next=%2Fdashboard%2F"
-    stats_url = f"{DJANGO_BASE_URL}/api/dashboard/stats/"
+    sso_url = f"{DJANGO_BACKEND_URL}/api/auth/sso/?token={quote(token, safe='')}&next=%2Fdashboard%2F"
+    stats_url = f"{DJANGO_BACKEND_URL}/api/dashboard/stats/"
 
     try:
         with requests.Session() as django_session:
