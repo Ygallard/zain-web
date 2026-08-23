@@ -17,4 +17,4 @@ EXPOSE 8000
 
 USER 10001:10001
 
-CMD ["sh", "-c", "gunicorn cuaderno_campo_django.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
+CMD ["sh", "-c", "gunicorn cuaderno_campo_django.wsgi:application --bind 0.0.0.0:${PORT}"]

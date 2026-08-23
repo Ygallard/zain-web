@@ -68,7 +68,6 @@ Thumbs.db
 
 # Docker
 .dockerignore
-docker-compose.yml
 Dockerfile
 
 # CI/CD
