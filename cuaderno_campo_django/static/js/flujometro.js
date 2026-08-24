@@ -678,6 +678,9 @@ async function initializeHomeView() {
 // Inicializar vista de informes
 async function initializeReportsView() {
     const informesList = document.getElementById('informes-list');
+    if (!informesList) {
+        return;
+    }
     
     try {
         // Cargar informes desde la API
