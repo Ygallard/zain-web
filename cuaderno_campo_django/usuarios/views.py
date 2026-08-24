@@ -260,7 +260,8 @@ def dashboard_view(request):
                 fecha_riego__gte=timezone.now().date() - timedelta(days=30)
             ).count(),
             "ultima_actividad_dashboard": (
-                f"{ultima_actividad.usuario.nombre} - {ultima_actividad.modulo} - {ultima_actividad.accion}"
+                f"{ultima_actividad.usuario.nombre if ultima_actividad.usuario else 'Usuario no disponible'} - "
+                f"{ultima_actividad.modulo} - {ultima_actividad.accion}"
                 if ultima_actividad
                 else "-"
             ),
@@ -269,8 +270,9 @@ def dashboard_view(request):
         # Última cosecha y aplicación química
         ultima_cosecha_obj = Cosecha.objects.select_related("cuartel").order_by("-fecha_cosecha", "-created_at", "-id").first()
         context["ultima_cosecha_dashboard"] = (
-            f"{ultima_cosecha_obj.cuartel.nombre_cuartel} - {ultima_cosecha_obj.fecha_cosecha.strftime('%d/%m/%Y')}"
-            if ultima_cosecha_obj
+            f"{ultima_cosecha_obj.cuartel.nombre_cuartel if ultima_cosecha_obj.cuartel else 'Cuartel no disponible'} - "
+            f"{ultima_cosecha_obj.fecha_cosecha.strftime('%d/%m/%Y')}"
+            if ultima_cosecha_obj and ultima_cosecha_obj.fecha_cosecha
             else "-"
         )
         
@@ -280,8 +282,9 @@ def dashboard_view(request):
             .first()
         )
         context["ultima_aplicacion_quimica_dashboard"] = (
-            f"{ultima_aplicacion_obj.cuartel.nombre_cuartel} - {ultima_aplicacion_obj.fecha_aplicacion.strftime('%d/%m/%Y')}"
-            if ultima_aplicacion_obj
+            f"{ultima_aplicacion_obj.cuartel.nombre_cuartel if ultima_aplicacion_obj.cuartel else 'Cuartel no disponible'} - "
+            f"{ultima_aplicacion_obj.fecha_aplicacion.strftime('%d/%m/%Y')}"
+            if ultima_aplicacion_obj and ultima_aplicacion_obj.fecha_aplicacion
             else "-"
         )
     
