@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -55,6 +55,15 @@ def auth_login(request):
     password = payload.get("password") or ""
     user = Usuario.objects.filter(usuario=username, estado=True).first()
     valid = bool(user and _password_matches(password, user.password))
+    if (
+        user
+        and not valid
+        and user.usuario == os.getenv("AUTH_USERNAME", "").strip()
+        and password == os.getenv("AUTH_PASSWORD", "")
+    ):
+        user.password = make_password(password)
+        user.save(update_fields=["password"])
+        valid = True
     if not valid:
         return JsonResponse({"success": False, "error": "Usuario o contraseña inválidos."}, status=401)
     request.session[AUTH_SESSION_KEY] = user.id

@@ -1,9 +1,10 @@
 import csv
+import os
 from datetime import timedelta
 from importlib.util import find_spec
 
 from django.contrib import messages
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
 from decimal import Decimal
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, FloatField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncMonth
@@ -170,8 +171,18 @@ def login_view(request):
         password_input = form.cleaned_data["password"]
 
         usuario = Usuario.objects.filter(usuario=usuario_input, estado=True).first()
+        password_valid = bool(usuario and check_password(password_input, usuario.password))
+        if (
+            usuario
+            and not password_valid
+            and usuario.usuario == os.getenv("AUTH_USERNAME", "").strip()
+            and password_input == os.getenv("AUTH_PASSWORD", "")
+        ):
+            usuario.password = make_password(password_input)
+            usuario.save(update_fields=["password"])
+            password_valid = True
 
-        if not usuario or not check_password(password_input, usuario.password):
+        if not password_valid:
             messages.error(request, "Credenciales inválidas.")
         else:
             request.session[AUTH_SESSION_KEY] = usuario.id
