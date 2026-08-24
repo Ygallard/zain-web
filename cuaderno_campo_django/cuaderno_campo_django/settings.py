@@ -17,6 +17,9 @@ def load_env_file(path):
         os.environ.setdefault(key, value)
 
 
+# The shared integrations live in the repository-root .env; Django-specific
+# settings may override them in cuaderno_campo_django/.env.
+load_env_file(BASE_DIR.parent / ".env")
 load_env_file(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-this-in-production")
