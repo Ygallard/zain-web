@@ -10,6 +10,70 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             sql="""
+            CREATE TABLE IF NOT EXISTS predios (
+                id BIGSERIAL PRIMARY KEY,
+                usuario_id BIGINT NOT NULL REFERENCES usuarios(id),
+                nombre_predio VARCHAR(100) NOT NULL,
+                ubicacion VARCHAR(150),
+                superficie NUMERIC(10,2),
+                descripcion TEXT,
+                estado BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS cuarteles (
+                id BIGSERIAL PRIMARY KEY,
+                predio_id BIGINT NOT NULL REFERENCES predios(id),
+                nombre_cuartel VARCHAR(100) NOT NULL,
+                tipo_cultivo VARCHAR(100),
+                variedad VARCHAR(100),
+                forma_riego VARCHAR(50),
+                anio_plantacion INTEGER,
+                superficie NUMERIC(10,2),
+                descripcion TEXT,
+                estado BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS riego (
+                id BIGSERIAL PRIMARY KEY,
+                cuartel_id BIGINT NOT NULL REFERENCES cuarteles(id),
+                fecha_riego DATE NOT NULL,
+                tipo_riego VARCHAR(100),
+                horas_riego NUMERIC(10,2),
+                caudal NUMERIC(10,2),
+                observaciones TEXT,
+                estado BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS fertilizacion (
+                id BIGSERIAL PRIMARY KEY,
+                cuartel_id BIGINT NOT NULL REFERENCES cuarteles(id),
+                fecha_aplicacion DATE NOT NULL,
+                producto VARCHAR(150),
+                dosis NUMERIC(10,2),
+                unidad VARCHAR(50),
+                metodo_aplicacion VARCHAR(100),
+                observaciones TEXT,
+                estado BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS cosechas (
+                id BIGSERIAL PRIMARY KEY,
+                cuartel_id BIGINT NOT NULL REFERENCES cuarteles(id),
+                fecha_cosecha DATE NOT NULL,
+                tipo_cosecha VARCHAR(100),
+                cantidad_kg NUMERIC(12,2),
+                cantidad_bins NUMERIC(10,2),
+                calidad VARCHAR(50),
+                destino VARCHAR(100),
+                observaciones TEXT,
+                estado BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
             ALTER TABLE predios
             ADD COLUMN IF NOT EXISTS superficie_hectareas NUMERIC(10,2),
             ADD COLUMN IF NOT EXISTS inscripcion_cbr VARCHAR(255),
