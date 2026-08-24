@@ -170,7 +170,7 @@ def login_view(request):
         usuario_input = form.cleaned_data["usuario"].strip()
         password_input = form.cleaned_data["password"]
 
-        usuario = Usuario.objects.filter(usuario=usuario_input, estado=True).first()
+        usuario = Usuario.objects.filter(usuario__iexact=usuario_input, estado=True).first()
         password_valid = bool(usuario and check_password(password_input, usuario.password))
         if (
             usuario

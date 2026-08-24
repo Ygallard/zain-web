@@ -53,7 +53,7 @@ def auth_login(request):
         payload = {}
     username = (payload.get("username") or "").strip()
     password = payload.get("password") or ""
-    user = Usuario.objects.filter(usuario=username, estado=True).first()
+    user = Usuario.objects.filter(usuario__iexact=username, estado=True).first()
     valid = bool(user and _password_matches(password, user.password))
     if (
         user
