@@ -34,4 +34,4 @@ EXPOSE 8000
 
 USER 10001:10001
 
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn -c gunicorn.conf.py cuaderno_campo_django.wsgi:application"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py bootstrap_admin && exec gunicorn -c gunicorn.conf.py cuaderno_campo_django.wsgi:application"]
