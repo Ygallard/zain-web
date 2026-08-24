@@ -112,5 +112,14 @@ X_FRAME_OPTIONS = 'ALLOWALL'
 
 # Confiar en solicitudes CSRF desde entorno local y subdominios de UrraHosting
 raw_csrf = os.getenv("CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:5000,http://localhost:5000,https://*.urrahosting.com")
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in raw_csrf.split(",") if origin.strip()]
+CSRF_TRUSTED_ORIGINS = []
+for origin in raw_csrf.split(","):
+    origin = origin.strip()
+    if not origin:
+        continue
+    if origin.startswith(("http//", "https//")):
+        origin = origin.replace("//", "://", 1)
+    elif "://" not in origin:
+        origin = f"https://{origin}"
+    CSRF_TRUSTED_ORIGINS.append(origin)
 
