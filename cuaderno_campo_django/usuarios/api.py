@@ -1,6 +1,5 @@
 """
-API endpoints para autenticación centralizada
-Permite que todos los módulos (Django, Flask, etc.) usen el mismo sistema de auth
+API endpoints para autenticación centralizada.
 """
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -322,7 +321,7 @@ def auth_sso(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def auth_activity_log(request):
-    """Registra actividad remota (por ejemplo, módulo de Flujómetro en Flask)."""
+    """Registra actividad de módulos integrados."""
     token = get_token_from_request(request)
     token_data = validate_auth_token(token) if token else None
 

@@ -1,7 +1,7 @@
 # 💧 Zaino Web - Flujómetro de Agua en Tiempo Real
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)
+![Django](https://img.shields.io/badge/Django-5.1+-green.svg)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-purple.svg)
 ![jQuery](https://img.shields.io/badge/jQuery-3.6-blue.svg)
 ![Arduino IoT](https://img.shields.io/badge/Arduino-IoT%20Cloud-00979D.svg)
@@ -10,9 +10,9 @@
 
 ## 📋 Descripción
 
-**Zaino Web** es una aplicación web desarrollada en colaboración con el **Instituto Profesional AIEP** para una comunidad que necesitaba monitorear en tiempo real el caudal de agua de un río. La solución integra hardware IoT con Arduino, sensores de flujo, y una interfaz web moderna desarrollada con Python Flask, permitiendo visualizar datos en tiempo real, estadísticas históricas y generar informes.
+**Zaino Web** es una aplicación web desarrollada en colaboración con el **Instituto Profesional AIEP** para una comunidad que necesitaba monitorear en tiempo real el caudal de agua de un río. La solución integra hardware IoT con Arduino, sensores de flujo, y una interfaz web moderna desarrollada con Django, permitiendo visualizar datos en tiempo real, estadísticas históricas y generar informes.
 
-Este proyecto combina tecnologías de IoT, backend con Flask, y un frontend responsive para ofrecer una experiencia completa de monitoreo hídrico.
+Este proyecto combina tecnologías de IoT, backend con Django y un frontend responsive para ofrecer una experiencia completa de monitoreo hídrico.
 
 ---
 
@@ -93,7 +93,7 @@ Este proyecto combina tecnologías de IoT, backend con Flask, y un frontend resp
 
 ### Backend
 - **Python 3.8+**
-- **Flask 2.0+** - Framework web
+- **Django 5.1+** - Framework web
 - **Requests** - Cliente HTTP
 - **OAuth2Session** - Autenticación con Arduino IoT Cloud
 - **Python-dotenv** - Gestión de variables de entorno
@@ -126,31 +126,24 @@ Este proyecto combina tecnologías de IoT, backend con Flask, y un frontend resp
 ```
 zaino-web/
 │
-├── app/
-│   ├── __init__.py
-│   ├── controllers/
-│   │   ├── api_controller.py      # Endpoints de la API
-│   │   └── app_controller.py      # Controladores de vistas
+├── cuaderno_campo_django/
+│   ├── flujometro/
+│   │   ├── services.py             # Arduino IoT Cloud
+│   │   ├── views.py                # Vistas y APIs del flujómetro
+│   │   └── templates/flujometro/   # Interfaz del flujómetro
 │   ├── static/
 │   │   ├── css/
-│   │   │   └── app.css            # Estilos principales
+│   │   │   └── flujometro.css      # Estilos principales
 │   │   ├── js/
-│   │   │   ├── app.js             # Lógica principal
-│   │   │   └── debug.js           # Herramientas de debug
-│   │   └── img/                   # Imágenes y recursos
-│   ├── templates/
-│   │   └── app.html               # Template principal
-│   └── utils/
-│       ├── config.py              # Configuración
-│       └── weathercloud_py.py     # Cliente Weathercloud
+│   │   │   └── flujometro.js       # Lógica principal
+│   │   └── templates/              # Templates del cuaderno
+│   ├── usuarios/                  # Usuarios, permisos y dominio agrícola
+│   └── manage.py
 │
 ├── informes/                      # Informes generados (creado automáticamente)
 ├── .env                           # Variables de entorno (no incluido)
 ├── .gitignore
-├── app.py                         # Punto de entrada
-├── Pipfile                        # Dependencias Pipenv
 ├── requirements.txt               # Dependencias pip
-├── visitas.json                   # Contador de visitas
 └── README.md
 ```
 
@@ -174,12 +167,11 @@ WEATHERCLOUD_PASSWORD=tu_password_weathercloud
 # Configuración de estación meteorológica
 WEATHERCLOUD_DEVICEID=ID_DE_TU_ESTACION
 
-# Flask Security - Clave secreta (IMPORTANTE EN PRODUCCIÓN)
+# Django Security - Clave secreta (IMPORTANTE EN PRODUCCIÓN)
 # Genera una con: python -c "import os; print(os.urandom(24).hex())"
 SECRET_KEY=tu_clave_secreta_aleatoria_aqui
 
-# Flask Port - Puerto donde se ejecutará la aplicación (IMPORTANTE SI SE USA DOCKER)
-PORT=5000 # Cambiar en caso de ser necesario
+# Puerto: UrraHosting inyecta PORT automáticamente
 ```
 
 > **Nota de Seguridad**: Si no especificas una `SECRET_KEY`, la aplicación generará una aleatoria automáticamente. Sin embargo, esto hará que las sesiones se invaliden cada vez que reinicies el servidor. Para producción, **siempre configura una SECRET_KEY fija**.
@@ -240,7 +232,8 @@ cp .env.example .env
 # Edita el archivo .env con tus credenciales
 
 # Ejecutar la aplicación
-python app.py
+cd cuaderno_campo_django
+python manage.py runserver
 ```
 
 ### Opción 2: Usando pip
@@ -267,10 +260,11 @@ cp .env.example .env
 # Edita el archivo .env con tus credenciales
 
 # Ejecutar la aplicación
-python app.py
+cd cuaderno_campo_django
+python manage.py runserver
 ```
 
-La aplicación estará disponible en: `http://localhost:5000`
+La aplicación estará disponible en: `http://localhost:8000`
 
 ---
 
@@ -284,44 +278,11 @@ La aplicación estará disponible en: `http://localhost:5000`
 
 #### Usando Docker 🐳
 
-**1. Crear archivo `Dockerfile`**
-```dockerfile
-# Use official Python base image
-FROM python:3.11-slim
+La raíz contiene un único `Dockerfile` multi-stage. UrraHosting inyecta `PORT`; el contenedor ejecuta `collectstatic`, `migrate` y Gunicorn mediante `gunicorn.conf.py`.
 
-# Set working directory
-WORKDIR /app
-
-# Install curl
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# Copy dependency files
-COPY requirements.txt ./
-
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application
-COPY . .
-
-# Expose port
-EXPOSE 5000
-
-# Command to run the app
-CMD ["python", "app.py"]
-```
-#### Flask nativo (Solo desarrollo/pruebas)
-
-> **⚠️ ADVERTENCIA**: Flask nativo NO es recomendado para producción. Usa Docker en su lugar.
-
-**Ejecución directa**
 ```bash
-# Configurar modo producción
-export FLASK_ENV=production  # Linux/Mac
-$env:FLASK_ENV="production"  # Windows PowerShell
-
-# Ejecutar
-python app.py
+docker build -t zaino-web .
+docker run --env-file .env -p 8000:8000 zaino-web
 ```
 
 ---

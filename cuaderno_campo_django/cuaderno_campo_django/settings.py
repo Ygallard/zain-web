@@ -37,10 +37,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "usuarios",
+    "flujometro",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -94,6 +96,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -103,7 +107,7 @@ CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_AGE = int(os.getenv("DJANGO_SESSION_COOKIE_AGE", "43200"))
 SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv("DJANGO_SESSION_EXPIRE_AT_BROWSER_CLOSE", "True").lower() == "true"
 
-# Permitir iframes (para integración con Flask)
+# Permitir iframes para integraciones externas autorizadas.
 X_FRAME_OPTIONS = 'ALLOWALL'
 
 # Confiar en solicitudes CSRF desde entorno local y subdominios de UrraHosting
