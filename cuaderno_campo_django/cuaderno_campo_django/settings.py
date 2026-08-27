@@ -114,8 +114,13 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv("DJANGO_SESSION_EXPIRE_AT_BROWSER_CL
 # Permitir iframes para integraciones externas autorizadas.
 X_FRAME_OPTIONS = 'ALLOWALL'
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Confiar en solicitudes CSRF desde entorno local y subdominios de UrraHosting
-raw_csrf = os.getenv("CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:5000,http://localhost:5000,https://*.urrahosting.com")
+raw_csrf = os.getenv(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://127.0.0.1:5000,http://localhost:5000,https://*.urrahosting.com,https://*.urrahosting.cl",
+)
 CSRF_TRUSTED_ORIGINS = []
 for origin in raw_csrf.split(","):
     origin = origin.strip()
