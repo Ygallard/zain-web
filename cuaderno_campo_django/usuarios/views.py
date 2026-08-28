@@ -1337,6 +1337,17 @@ def build_export_dependency_error_response(request, missing_packages):
 
 def get_riego_export_dataset(request):
     riegos, filtros = get_riego_gestion_queryset(request)
+    riego_ids = list(riegos.values_list("id", flat=True))
+    comentarios = (
+        ComentarioTecnico.objects.select_related("usuario_prodesal")
+        .filter(modulo="riego", objeto_id__in=riego_ids)
+        .order_by("fecha", "id")
+    )
+    comentarios_por_riego = {}
+    for comentario in comentarios:
+        comentarios_por_riego.setdefault(comentario.objeto_id, []).append(
+            f"{comentario.usuario_prodesal.nombre} ({timezone.localtime(comentario.fecha).strftime('%d/%m/%Y %H:%M')}): {comentario.comentario}"
+        )
 
     predio_label = "Todos"
     if filtros["predio_id"]:
@@ -1367,6 +1378,7 @@ def get_riego_export_dataset(request):
 
     return {
         "riegos": riegos,
+        "comentarios_por_riego": comentarios_por_riego,
         "filtros": filtros,
         "filtros_aplicados": filtros_aplicados,
         "total_registros": riegos.count(),
@@ -1397,12 +1409,12 @@ def riego_export_excel_view(request):
 
     ws["A1"] = "Cuaderno de Campo Digital"
     ws["A1"].font = Font(size=15, bold=True, color="1F4E78")
-    ws.merge_cells("A1:F1")
+    ws.merge_cells("A1:K1")
 
     ws["A2"] = f"Reporte de Riego - Generado: {timezone.localtime().strftime('%d/%m/%Y %H:%M')}"
-    ws.merge_cells("A2:F2")
+    ws.merge_cells("A2:K2")
     ws["A3"] = f"Usuario: {current_user.nombre if current_user else '-'}"
-    ws.merge_cells("A3:G3")
+    ws.merge_cells("A3:K3")
 
     ws["A5"] = "Filtros aplicados"
     ws["A5"].font = Font(bold=True)
@@ -1416,7 +1428,7 @@ def riego_export_excel_view(request):
         filtro_row += 1
 
     table_row = filtro_row + 1
-    headers = ["Fecha", "Predio", "Cuartel", "Minutos", "Litros", "Responsable", "Observaciones"]
+    headers = ["Fecha", "Hora creación", "Predio", "Cuartel", "Tipo de riego", "Minutos", "Caudal", "Litros", "Responsable", "Observaciones", "Observaciones PRODESAL"]
     for idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=table_row, column=idx, value=header)
         cell.font = Font(bold=True, color="FFFFFF")
@@ -1434,16 +1446,20 @@ def riego_export_excel_view(request):
     for riego in dataset["riegos"]:
         litros = float(getattr(riego, "litros_estimados", 0) or 0)
         ws.cell(data_row, 1, riego.fecha_riego.strftime("%d/%m/%Y") if riego.fecha_riego else "-")
-        ws.cell(data_row, 2, riego.cuartel.predio.nombre_predio)
-        ws.cell(data_row, 3, riego.cuartel.nombre_cuartel)
-        ws.cell(data_row, 4, float(riego.minutos_riego or 0))
-        ws.cell(data_row, 5, litros)
-        ws.cell(data_row, 6, riego.cuartel.predio.usuario.nombre)
-        ws.cell(data_row, 7, riego.observaciones or "-")
+        ws.cell(data_row, 2, timezone.localtime(riego.created_at).strftime("%d/%m/%Y %H:%M") if riego.created_at else "-")
+        ws.cell(data_row, 3, riego.cuartel.predio.nombre_predio)
+        ws.cell(data_row, 4, riego.cuartel.nombre_cuartel)
+        ws.cell(data_row, 5, riego.get_tipo_riego_display() if riego.tipo_riego else "-")
+        ws.cell(data_row, 6, float(riego.minutos_riego or 0))
+        ws.cell(data_row, 7, float(riego.caudal or 0))
+        ws.cell(data_row, 8, litros)
+        ws.cell(data_row, 9, riego.cuartel.predio.usuario.nombre)
+        ws.cell(data_row, 10, riego.observaciones or "-")
+        ws.cell(data_row, 11, "\n".join(dataset["comentarios_por_riego"].get(riego.id, [])) or "-")
 
-        ws.cell(data_row, 4).number_format = "#,##0.00"
-        ws.cell(data_row, 5).number_format = "#,##0.00"
-        for col in range(1, 8):
+        for col in range(6, 9):
+            ws.cell(data_row, col).number_format = "#,##0.00"
+        for col in range(1, 12):
             ws.cell(data_row, col).border = thin_border
             ws.cell(data_row, col).alignment = Alignment(vertical="top", wrap_text=True)
         data_row += 1
@@ -1459,13 +1475,8 @@ def riego_export_excel_view(request):
     ws.cell(summary_row + 1, 2).number_format = "#,##0.00"
 
     column_widths = {
-        "A": 14,
-        "B": 24,
-        "C": 24,
-        "D": 14,
-        "E": 14,
-        "F": 24,
-        "G": 42,
+        "A": 14, "B": 20, "C": 24, "D": 24, "E": 20, "F": 14,
+        "G": 14, "H": 14, "I": 24, "J": 42, "K": 48,
     }
     for col, width in column_widths.items():
         ws.column_dimensions[col].width = width
@@ -1700,6 +1711,13 @@ def riego_export_pdf_view(request):
             info_style,
         )
     )
+    story.append(
+        Paragraph(
+            f"Fecha inicio: {dataset['filtros']['fecha_desde'] or '-'} | "
+            f"Fecha fin: {dataset['filtros']['fecha_hasta'] or '-'}",
+            info_style,
+        )
+    )
     story.append(Spacer(1, 4 * mm))
 
     summary_cards = [
@@ -1773,21 +1791,24 @@ def riego_export_pdf_view(request):
 
     story.append(Paragraph("<b>Detalle de Registros</b>", subtitle_style))
 
-    table_data = [["Fecha", "Predio", "Cuartel", "Minutos", "Litros", "Responsable", "Observaciones"]]
+    table_data = [["Fecha", "Hora creación", "Predio", "Cuartel", "Tipo", "Minutos", "Caudal", "Litros", "Responsable", "Observaciones"]]
     for riego in dataset["riegos"]:
         table_data.append(
             [
                 riego.fecha_riego.strftime("%d/%m/%Y") if riego.fecha_riego else "-",
+                timezone.localtime(riego.created_at).strftime("%d/%m/%Y %H:%M") if riego.created_at else "-",
                 riego.cuartel.predio.nombre_predio,
                 riego.cuartel.nombre_cuartel,
+                riego.get_tipo_riego_display() if riego.tipo_riego else "-",
                 f"{float(riego.minutos_riego or 0):.2f}",
+                f"{float(riego.caudal or 0):.2f}",
                 f"{float(getattr(riego, 'litros_estimados', 0) or 0):.2f}",
                 riego.cuartel.predio.usuario.nombre,
                 (riego.observaciones or "-")[:120],
             ]
         )
 
-    col_widths = [20 * mm, 30 * mm, 26 * mm, 16 * mm, 16 * mm, 26 * mm, 46 * mm]
+    col_widths = [16 * mm, 18 * mm, 22 * mm, 22 * mm, 17 * mm, 12 * mm, 12 * mm, 14 * mm, 21 * mm, 26 * mm]
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
     table.setStyle(
         TableStyle(
@@ -1796,7 +1817,7 @@ def riego_export_pdf_view(request):
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+                ("ALIGN", (5, 1), (7, -1), "RIGHT"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#D9D9D9")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -1806,6 +1827,20 @@ def riego_export_pdf_view(request):
     )
     story.append(table)
     story.append(Spacer(1, 4 * mm))
+    story.append(Paragraph("<b>Observaciones PRODESAL</b>", subtitle_style))
+    prodesal_rows = []
+    for riego in dataset["riegos"]:
+        comentarios = dataset["comentarios_por_riego"].get(riego.id, [])
+        if comentarios:
+            prodesal_rows.append(
+                Paragraph(
+                    f"<b>{riego.cuartel.predio.nombre_predio} / {riego.cuartel.nombre_cuartel}:</b> "
+                    + "<br/>".join(comentarios),
+                    body_style,
+                )
+            )
+    story.extend(prodesal_rows or [Paragraph("Sin observaciones PRODESAL para el periodo seleccionado.", body_style)])
+    story.append(Spacer(1, 3 * mm))
     story.append(
         Paragraph(
             f"<b>Total registros:</b> {dataset['total_registros']} &nbsp;&nbsp;&nbsp; "

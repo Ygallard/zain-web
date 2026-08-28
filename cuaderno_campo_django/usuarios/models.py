@@ -1,5 +1,13 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+
+
+class CreatedAtMixin:
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.created_at is None:
+            self.created_at = timezone.now()
+        super().save(*args, **kwargs)
 
 
 class Usuario(models.Model):
@@ -42,7 +50,7 @@ class Usuario(models.Model):
         return f"{self.nombre} ({self.usuario})"
 
 
-class Predio(models.Model):
+class Predio(CreatedAtMixin, models.Model):
     usuario = models.ForeignKey(
         Usuario,
         models.DO_NOTHING,
@@ -72,7 +80,7 @@ class Predio(models.Model):
         return self.nombre_predio
 
 
-class Cuartel(models.Model):
+class Cuartel(CreatedAtMixin, models.Model):
     TIPO_PLANTACION_CHOICES = [
         ("olivo", "Olivo"),
         ("durazno", "Durazno"),
@@ -118,7 +126,7 @@ class Cuartel(models.Model):
         return f"{self.nombre_cuartel} ({self.predio.nombre_predio})"
 
 
-class Riego(models.Model):
+class Riego(CreatedAtMixin, models.Model):
     TIPO_RIEGO_CHOICES = [
         ("goteo", "Goteo"),
         ("tendido_taza", "Tendido (x taza)"),
@@ -151,7 +159,7 @@ class Riego(models.Model):
         return f"Riego {self.id} - {self.cuartel.nombre_cuartel}"
 
 
-class Fertilizacion(models.Model):
+class Fertilizacion(CreatedAtMixin, models.Model):
     PRODUCTO_CHOICES = [
         ("urea", "Urea"),
         ("mezcla", "Mezcla"),
@@ -185,7 +193,7 @@ class Fertilizacion(models.Model):
         return f"Fertilización {self.id} - {self.cuartel.nombre_cuartel}"
 
 
-class Cosecha(models.Model):
+class Cosecha(CreatedAtMixin, models.Model):
     CALIDAD_CHOICES = [
         ("excelente", "Excelente"),
         ("muy_buena", "Muy buena"),
@@ -229,7 +237,7 @@ class Cosecha(models.Model):
         return f"Cosecha {self.id} - {self.cuartel.nombre_cuartel}"
 
 
-class AplicacionQuimica(models.Model):
+class AplicacionQuimica(CreatedAtMixin, models.Model):
     cuartel = models.ForeignKey(
         Cuartel,
         models.DO_NOTHING,
@@ -305,7 +313,7 @@ class LogActividad(models.Model):
         raise ValidationError("Los logs de actividad no se pueden eliminar.")
 
 
-class LaborAgricola(models.Model):
+class LaborAgricola(CreatedAtMixin, models.Model):
     TIPO_LABOR_CHOICES = [
         ("poda", "Poda"),
         ("brote", "Brote"),

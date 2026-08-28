@@ -826,8 +826,18 @@ function showGenerateReportModal() {
                                 Se generará un informe del último mes. Solo se permite un informe por mes.
                             </div>
                             <p class="text-muted mb-0">
-                                <small>El informe incluirá datos de caudal, estadísticas y análisis del período mensual.</small>
+                                <small>El informe incluirá datos de caudal, estadísticas y análisis del período seleccionado.</small>
                             </p>
+                            <div class="row g-3 mt-2">
+                                <div class="col-sm-6">
+                                    <label class="form-label" for="informeFechaInicio">Fecha inicio</label>
+                                    <input class="form-control" type="date" id="informeFechaInicio" required>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label" for="informeFechaFin">Fecha fin</label>
+                                    <input class="form-control" type="date" id="informeFechaFin" required>
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -860,6 +870,13 @@ async function generateReport() {
     const btn = document.getElementById('btnGenerarInforme');
     const btnClose = document.querySelector('#generateReportModal .btn-close');
     const btnCancel = document.querySelector('#generateReportModal .btn-secondary');
+    const fechaInicio = document.getElementById('informeFechaInicio')?.value;
+    const fechaFin = document.getElementById('informeFechaFin')?.value;
+
+    if (!fechaInicio || !fechaFin || fechaInicio > fechaFin) {
+        showToast('Selecciona un rango de fechas válido.', 'error');
+        return;
+    }
     
     try {
         // Mostrar indicador de carga
@@ -877,7 +894,7 @@ async function generateReport() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ periodo: 'ultimo_mes' })
+            body: JSON.stringify({ fecha_inicio: fechaInicio, fecha_fin: fechaFin })
         });
         
         const data = await response.json();

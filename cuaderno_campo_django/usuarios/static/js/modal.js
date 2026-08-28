@@ -554,6 +554,10 @@ function initRecordRowDetails(config) {
         return;
     }
 
+    if (container.querySelector('[onclick*="openRegistroDetalle"]')) {
+        return;
+    }
+
     const refreshRows = () => {
         container.querySelectorAll(rowSelector).forEach((row) => {
             if (row.dataset.id) {

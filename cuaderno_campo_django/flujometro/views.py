@@ -1,13 +1,14 @@
 import calendar
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
@@ -136,7 +137,7 @@ def informes(request):
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        timestamp = datetime.fromtimestamp(path.stat().st_mtime)
+        timestamp = timezone.localtime(datetime.fromtimestamp(path.stat().st_mtime, dt_timezone.utc))
         result.append({"id": path.stem, "nombre": data.get("nombre", path.name), "fecha": timestamp.strftime("%d/%m/%Y"), "fecha_completa": timestamp.strftime("%d/%m/%Y %H:%M"), "periodo": data.get("periodo", "N/A"), "datos": data})
     result.sort(key=lambda item: item["fecha_completa"], reverse=True)
     return JsonResponse({"success": True, "informes": result})
@@ -146,7 +147,26 @@ def informes(request):
 def generar_informe(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido."}, status=405)
-    now = datetime.now()
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    now = timezone.localtime()
+    fecha_inicio = payload.get("fecha_inicio")
+    fecha_fin = payload.get("fecha_fin")
+    try:
+        fecha_inicio_obj = date.fromisoformat(fecha_inicio) if fecha_inicio else None
+        fecha_fin_obj = date.fromisoformat(fecha_fin) if fecha_fin else None
+    except ValueError:
+        return JsonResponse({"success": False, "error": "Las fechas deben tener formato válido."}, status=400)
+
+    if fecha_inicio_obj and fecha_fin_obj and fecha_inicio_obj > fecha_fin_obj:
+        return JsonResponse({"success": False, "error": "La fecha de inicio no puede ser posterior a la fecha fin."}, status=400)
+
+    if not fecha_inicio or not fecha_fin:
+        fecha_fin = now.date().isoformat()
+        fecha_inicio = (now.date() - timedelta(days=30)).isoformat()
     for path in _reports_dir().glob("*.json"):
         try:
             existing = json.loads(path.read_text(encoding="utf-8"))
@@ -155,7 +175,7 @@ def generar_informe(request):
             continue
         if generated.year == now.year and generated.month == now.month:
             return JsonResponse({"success": False, "error": "Ya existe un informe del mes actual."}, status=400)
-    data = {"nombre": "Informe de Caudal - Último Mes", "fecha_generacion": now.strftime("%d/%m/%Y %H:%M:%S"), "periodo": "Último Mes", "datos": {"flujo_instantaneo": 0, "flujo_acumulado": 0, "promedio_diario": 0}, "estadisticas": {"total_litros": 0, "promedio_lmin": 0}}
+    data = {"nombre": "Informe de Caudal", "fecha_generacion": now.strftime("%d/%m/%Y %H:%M:%S"), "fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin, "periodo": f"{fecha_inicio} a {fecha_fin}", "datos": {"flujo_instantaneo": 0, "flujo_acumulado": 0, "promedio_diario": 0}, "estadisticas": {"total_litros": 0, "promedio_lmin": 0}}
     path = _reports_dir() / f"informe_{now.strftime('%Y%m%d_%H%M%S')}.json"
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return JsonResponse({"success": True, "message": "Informe generado exitosamente", "informe": {"id": path.stem, "nombre": data["nombre"], "fecha": now.strftime("%d/%m/%Y"), "periodo": data["periodo"]}})
