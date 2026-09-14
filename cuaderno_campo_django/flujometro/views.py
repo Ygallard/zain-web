@@ -129,6 +129,15 @@ def _reports_dir():
     return path
 
 
+def _numeric_value(property_data):
+    if not isinstance(property_data, dict):
+        return 0.0
+    try:
+        return float(property_data.get("value") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 @require_GET
 def informes(request):
     result = []
@@ -175,7 +184,35 @@ def generar_informe(request):
             continue
         if generated.year == now.year and generated.month == now.month:
             return JsonResponse({"success": False, "error": "Ya existe un informe del mes actual."}, status=400)
-    data = {"nombre": "Informe de Caudal", "fecha_generacion": now.strftime("%d/%m/%Y %H:%M:%S"), "fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin, "periodo": f"{fecha_inicio} a {fecha_fin}", "datos": {"flujo_instantaneo": 0, "flujo_acumulado": 0, "promedio_diario": 0}, "estadisticas": {"total_litros": 0, "promedio_lmin": 0}}
+
+    flow_payload, flow_status = ArduinoFlowmeterService().get_data()
+    if flow_status != 200 or not flow_payload.get("success"):
+        return JsonResponse({
+            "success": False,
+            "error": "No se pudo obtener la lectura del flujómetro. El informe no fue generado.",
+        }, status=502)
+
+    flow_data = flow_payload.get("data") or {}
+    flujo_instantaneo = _numeric_value(flow_data.get("constflow"))
+    flujo_acumulado = _numeric_value(flow_data.get("instflow"))
+    dias_periodo = (date.fromisoformat(fecha_fin) - date.fromisoformat(fecha_inicio)).days + 1
+    promedio_diario = flujo_acumulado / dias_periodo if dias_periodo else 0.0
+    data = {
+        "nombre": "Informe de Caudal",
+        "fecha_generacion": now.strftime("%d/%m/%Y %H:%M:%S"),
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "periodo": f"{fecha_inicio} a {fecha_fin}",
+        "datos": {
+            "flujo_instantaneo": flujo_instantaneo,
+            "flujo_acumulado": flujo_acumulado,
+            "promedio_diario": promedio_diario,
+        },
+        "estadisticas": {
+            "total_litros": flujo_acumulado,
+            "promedio_lmin": flujo_instantaneo,
+        },
+    }
     path = _reports_dir() / f"informe_{now.strftime('%Y%m%d_%H%M%S')}.json"
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return JsonResponse({"success": True, "message": "Informe generado exitosamente", "informe": {"id": path.stem, "nombre": data["nombre"], "fecha": now.strftime("%d/%m/%Y"), "periodo": data["periodo"]}})
