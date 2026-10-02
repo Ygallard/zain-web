@@ -2,17 +2,20 @@
 Servicio de integración con la API oficial de Weather Underground.
 Consulta datos meteorológicos de estaciones personales (PWS).
 """
+import calendar
 import os
 import logging
+import math
 import socket
 import traceback
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from django.core.cache import cache
 from dotenv import load_dotenv
+from django.utils import timezone as django_timezone
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +30,10 @@ class WeatherService:
     BASE_URL = "https://api.weather.com/v2/pws/observations/current"
     CACHE_TTL = 300  # 5 minutos
     CACHE_KEY_PREFIX = "weather:current"
+    HISTORY_BASE_URL = "https://api.weather.com/v2/pws/history/daily"
+    HISTORY_CACHE_TTL = 60 * 60
+    HISTORY_CACHE_KEY_PREFIX = "weather:history"
+    HISTORY_MAX_RANGE_DAYS = 30
     TIMEOUT = 10
     VERIFY_SSL = True
     
@@ -140,6 +147,162 @@ class WeatherService:
                 "error": "Error procesando datos meteorológicos.",
                 "source_hint": "error"
             }
+
+    def get_rain_history(self, year, as_of=None):
+        """Obtiene resúmenes diarios y acumula lluvia sin asumir días faltantes."""
+        station_id = self.station_id
+        if not self.api_key or not station_id:
+            return {"success": False, "error": "Credenciales meteorológicas no configuradas."}
+
+        today = as_of or django_timezone.localdate()
+        if not isinstance(year, int) or year < 1900 or year > today.year:
+            return {"success": False, "error": "El año solicitado no es válido o todavía no está disponible."}
+
+        cache_key = f"{self.HISTORY_CACHE_KEY_PREFIX}:{station_id}:{year}"
+        stale_key = f"{cache_key}:last_valid"
+        cached_payload = cache.get(cache_key)
+        if cached_payload:
+            payload = dict(cached_payload)
+            payload["cached"] = True
+            return payload
+
+        period_end = min(date(year, 12, 31), today)
+        observations = []
+        fetch_error = None
+        block_start = date(year, 1, 1)
+        while block_start <= period_end:
+            block_end = min(
+                block_start + timedelta(days=self.HISTORY_MAX_RANGE_DAYS - 1),
+                period_end,
+            )
+            try:
+                response = self.session.get(
+                    self.HISTORY_BASE_URL,
+                    params={
+                        "stationId": station_id,
+                        "apiKey": self.api_key,
+                        "units": "m",
+                        "format": "json",
+                        "startDate": block_start.strftime("%Y%m%d"),
+                        "endDate": block_end.strftime("%Y%m%d"),
+                    },
+                    timeout=self.TIMEOUT,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict) or not isinstance(payload.get("observations"), list):
+                    raise ValueError("Respuesta histórica sin lista de observaciones")
+                observations.extend(payload["observations"])
+            except (requests.RequestException, ValueError) as exc:
+                fetch_error = exc
+                logger.warning(
+                    "Weather history: error consultando resumen diario; station=%s period=%s..%s error=%s",
+                    station_id,
+                    block_start,
+                    block_end,
+                    type(exc).__name__,
+                )
+                break
+            block_start = block_end + timedelta(days=1)
+
+        if fetch_error:
+            stale_payload = cache.get(stale_key)
+            if stale_payload:
+                result = dict(stale_payload)
+                result["cached"] = True
+                result["stale"] = True
+                result["warning"] = "El proveedor no responde; se muestran los últimos datos válidos almacenados."
+                return result
+            return {"success": False, "error": "No se pudo consultar el historial de precipitaciones."}
+
+        result = self._summarize_rain_history(observations, year, period_end)
+        result["updated_at"] = datetime.now(timezone.utc).isoformat()
+        result["cached"] = False
+        if not result["available_days"]:
+            logger.warning(
+                "Weather history: no hay precipitación diaria utilizable; station=%s year=%s observations=%s",
+                station_id,
+                year,
+                len(observations),
+            )
+            result["warning"] = "No hay resúmenes diarios de precipitación disponibles para este año."
+        cache.set(cache_key, result, self.HISTORY_CACHE_TTL)
+        if result["available_days"]:
+            cache.set(stale_key, result, None)
+        return result
+
+    def _summarize_rain_history(self, observations, year, period_end):
+        """Calcula totales usando únicamente precipTotal diario y fechas únicas."""
+        daily_values = {}
+        for observation in observations:
+            if not isinstance(observation, dict):
+                continue
+            raw_day = observation.get("obsTimeLocal") or observation.get("obsTimeUtc")
+            try:
+                observation_day = date.fromisoformat(str(raw_day)[:10])
+            except (TypeError, ValueError):
+                continue
+            if observation_day.year != year or observation_day > period_end:
+                continue
+
+            metric = observation.get("metric")
+            if not isinstance(metric, dict) or metric.get("precipTotal") is None:
+                continue
+            try:
+                amount = float(metric["precipTotal"])
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(amount) and amount >= 0:
+                daily_values.setdefault(observation_day, amount)
+
+        monthly = []
+        for month in range(1, 13):
+            month_start = date(year, month, 1)
+            if month_start > period_end:
+                monthly.append({"month": month, "total_mm": None, "available_days": 0, "expected_days": 0, "status": "future"})
+                continue
+            month_end = min(date(year, month, calendar.monthrange(year, month)[1]), period_end)
+            expected_days = (month_end - month_start).days + 1
+            month_dates = [month_start + timedelta(days=offset) for offset in range(expected_days)]
+            values = [
+                amount for day, amount in daily_values.items()
+                if month_start <= day <= month_end
+            ]
+            available_days = len(values)
+            missing_days = [day.isoformat() for day in month_dates if day not in daily_values]
+            monthly.append({
+                "month": month,
+                "total_mm": round(sum(values), 1) if values else None,
+                "available_days": available_days,
+                "expected_days": expected_days,
+                "missing_days": missing_days,
+                "status": "unavailable" if not available_days else "complete" if available_days == expected_days else "partial",
+            })
+
+        expected_days = (period_end - date(year, 1, 1)).days + 1
+        available_days = len(daily_values)
+        annual_total = round(sum(daily_values.values()), 1) if available_days else None
+        missing_days = [
+            (date(year, 1, 1) + timedelta(days=offset)).isoformat()
+            for offset in range(expected_days)
+            if date(year, 1, 1) + timedelta(days=offset) not in daily_values
+        ]
+        return {
+            "success": True,
+            "year": year,
+            "annual_total_mm": annual_total,
+            "annual_available_days": available_days,
+            "annual_expected_days": expected_days,
+            "annual_complete": available_days == expected_days,
+            "missing_days": missing_days,
+            "missing_day_count": len(missing_days),
+            "available_days": available_days,
+            "expected_days": expected_days,
+            "incomplete": available_days != expected_days,
+            "months": monthly,
+            "available_years": [year] if available_days else [],
+            "warning": None if available_days == expected_days else "Hay días sin datos históricos; los acumulados muestran solo la suma de días válidos.",
+        }
     
     def _fetch_and_parse(self, station_id):
         """

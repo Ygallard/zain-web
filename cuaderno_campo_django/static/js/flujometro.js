@@ -55,6 +55,60 @@ const templates = {
             </div>
         </div>
     `,
+    tiempo: `
+        <div id="dashboard-tiempo" class="dashboard active-dashboard weather-dashboard">
+            <h2 class="dashboard-title">Tiempo</h2>
+            <div class="weather-tabs" role="tablist" aria-label="Secciones del tiempo">
+                <button class="weather-tab is-active" id="weather-current-tab" type="button" role="tab" aria-selected="true" aria-controls="weather-current-panel" data-weather-tab="current">
+                    <i class="bi bi-cloud-sun"></i> Tiempo actual
+                </button>
+                <button class="weather-tab" id="rain-history-tab" type="button" role="tab" aria-selected="false" aria-controls="rain-history-panel" data-weather-tab="history">
+                    <i class="bi bi-umbrella"></i> Historial de lluvias
+                </button>
+            </div>
+            <section id="weather-current-panel" class="weather-tab-panel" role="tabpanel" aria-labelledby="weather-current-tab">
+                <div class="card weather-section-card">
+                    <h3>Tiempo Actual</h3>
+                    <div id="weather-current-content" class="card-content"></div>
+                </div>
+            </section>
+            <section id="rain-history-panel" class="weather-tab-panel" role="tabpanel" aria-labelledby="rain-history-tab" hidden>
+                <div class="rain-history-toolbar">
+                    <label class="rain-select-field" for="rain-year-select">Año
+                        <select id="rain-year-select" class="form-select form-select-sm"></select>
+                    </label>
+                    <label class="rain-select-field" for="rain-month-select">Mes
+                        <select id="rain-month-select" class="form-select form-select-sm">
+                            <option value="0">Enero</option><option value="1">Febrero</option>
+                            <option value="2">Marzo</option><option value="3">Abril</option>
+                            <option value="4">Mayo</option><option value="5">Junio</option>
+                            <option value="6">Julio</option><option value="7">Agosto</option>
+                            <option value="8">Septiembre</option><option value="9">Octubre</option>
+                            <option value="10">Noviembre</option><option value="11">Diciembre</option>
+                        </select>
+                    </label>
+                    <span id="rain-history-updated" class="rain-updated-label">Actualización no disponible</span>
+                </div>
+                <div class="rain-summary-grid">
+                    <article class="rain-summary-item">
+                        <span>Acumulado anual</span>
+                        <strong id="rain-annual-total">--</strong>
+                        <small id="rain-annual-coverage">Esperando datos</small>
+                    </article>
+                    <article class="rain-summary-item">
+                        <span>Acumulado del mes</span>
+                        <strong id="rain-month-total">--</strong>
+                        <small id="rain-month-coverage">Selecciona un año</small>
+                    </article>
+                </div>
+                <div id="rain-history-warning" class="rain-history-warning" role="status" hidden></div>
+                <div class="card rain-chart-card">
+                    <h3>Precipitación mensual <small>(mm)</small></h3>
+                    <div id="rain-monthly-chart" class="rain-monthly-chart" aria-label="Precipitación diaria acumulada por mes"></div>
+                </div>
+            </section>
+        </div>
+    `,
     cuaderno: `
         <div id="dashboard-cuaderno" class="dashboard active-dashboard">
             <div class="card cuaderno-welcome-card">
@@ -192,6 +246,8 @@ const appState = {
     realtimeInterval: null,  // Para almacenar el intervalo de actualización
     weatherRefreshInterval: null,
     weatherRequestInProgress: false,
+    rainHistoryRequestId: 0,
+    rainHistoryData: null,
     flowHistory: [],  // Para almacenar el historial de datos
     lastFlowData: null,  // Cache del último dato recibido
     requestInProgress: false  // Flag para evitar peticiones simultáneas
@@ -306,10 +362,174 @@ function stopWeatherAutoRefresh() {
 function startWeatherAutoRefresh() {
     stopWeatherAutoRefresh();
     appState.weatherRefreshInterval = setInterval(() => {
-        if (appState.currentView === 'inicio') {
-            loadWeatherData();
+        const isCurrentWeatherTab = appState.currentView === 'tiempo'
+            && document.querySelector('[data-weather-tab="current"].is-active');
+        if (appState.currentView === 'inicio' || isCurrentWeatherTab) {
+            loadWeatherData(appState.currentView === 'inicio' ? undefined : '#weather-current-content');
         }
     }, 60 * 1000);  // Actualizar cada 60 segundos
+}
+
+const rainMonthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+function formatRainAmount(value) {
+    return value === null || value === undefined
+        ? '--'
+        : `${Number(value).toLocaleString('es-CL', { maximumFractionDigits: 1 })} mm`;
+}
+
+function formatMissingDays(count) {
+    if (count === 0) return 'sin días faltantes';
+    return count === 1 ? 'falta 1 día' : `faltan ${count} días`;
+}
+
+function formatDayCoverage(available, expected, missing) {
+    const dayLabel = expected === 1 ? 'día' : 'días';
+    return `${available} de ${expected} ${dayLabel} con datos; ${formatMissingDays(missing)}`;
+}
+
+function renderRainHistory(data) {
+    appState.rainHistoryData = data;
+    const annual = document.getElementById('rain-annual-total');
+    const annualCoverage = document.getElementById('rain-annual-coverage');
+    const monthTotal = document.getElementById('rain-month-total');
+    const monthCoverage = document.getElementById('rain-month-coverage');
+    const warning = document.getElementById('rain-history-warning');
+    const updated = document.getElementById('rain-history-updated');
+    const chart = document.getElementById('rain-monthly-chart');
+    if (!annual || !annualCoverage || !monthTotal || !monthCoverage || !warning || !updated || !chart) return;
+
+    const yearSelect = document.getElementById('rain-year-select');
+    const requestedYear = Number(yearSelect?.value || data.year);
+    const confirmedYears = new Set(data.available_years || []);
+    if (data.available_days > 0) confirmedYears.add(data.year);
+    if (yearSelect && confirmedYears.size) {
+        const selectedYear = confirmedYears.has(requestedYear) ? requestedYear : data.year;
+        yearSelect.innerHTML = [...confirmedYears].sort((left, right) => right - left)
+            .map(year => `<option value="${year}">${year}</option>`).join('');
+        yearSelect.value = String(selectedYear);
+    }
+
+    annual.textContent = formatRainAmount(data.annual_total_mm);
+    annualCoverage.textContent = formatDayCoverage(
+        data.annual_available_days,
+        data.annual_expected_days,
+        data.missing_day_count ?? 0
+    );
+    updated.textContent = data.updated_at
+        ? `Actualizado: ${new Date(data.updated_at).toLocaleString('es-CL')}${data.stale ? ' · último dato válido' : ''}`
+        : 'Actualización no disponible';
+
+    const selectedMonth = Number(document.getElementById('rain-month-select')?.value || 0);
+    const month = data.months?.[selectedMonth];
+    monthTotal.textContent = formatRainAmount(month?.total_mm);
+    monthCoverage.textContent = month
+        ? month.status === 'future'
+            ? 'Período futuro'
+            : formatDayCoverage(month.available_days, month.expected_days, month.missing_days?.length ?? 0)
+        : 'Sin datos del mes';
+
+    warning.hidden = !data.warning && !data.incomplete;
+    warning.textContent = data.warning || (data.incomplete
+        ? 'Hay días sin registros. El acumulado considera solo los días con precipitación válida.'
+        : '');
+
+    const values = (data.months || []).map(item => item.total_mm).filter(value => value !== null && value !== undefined);
+    const maximum = Math.max(...values, 1);
+    chart.innerHTML = (data.months || []).map((item, index) => {
+        const hasData = item.total_mm !== null && item.total_mm !== undefined;
+        const height = hasData && item.total_mm > 0 ? Math.max(4, (item.total_mm / maximum) * 100) : 0;
+        const valueLabel = hasData ? formatRainAmount(item.total_mm) : 'Sin datos';
+        const coverage = item.status === 'partial' ? `; ${item.available_days} de ${item.expected_days} días` : '';
+        const label = `${rainMonthNames[index]}: ${valueLabel}${coverage}`;
+        const missingDates = item.missing_days?.length ? `; días sin registro: ${item.missing_days.join(', ')}` : '';
+        return `<div class="rain-month-column ${hasData ? 'has-data' : 'is-missing'}" role="img" aria-label="${escapeHtml(`${label}${coverage ? `; ${formatMissingDays(item.missing_days?.length ?? 0)}` : ''}`)}" title="${escapeHtml(`${label}${missingDates}`)}">
+            <span class="rain-bar-value">${hasData ? formatWeatherValue(item.total_mm, 1) : '—'}</span>
+            <div class="rain-bar-track"><span class="rain-bar ${hasData ? (item.total_mm === 0 ? 'is-zero' : '') : 'is-missing'}" style="height:${height}%"></span></div>
+            <span class="rain-month-label">${rainMonthNames[index].slice(0, 3)}</span>
+        </div>`;
+    }).join('');
+}
+
+function renderRainHistoryError(message) {
+    const year = Number(document.getElementById('rain-year-select')?.value);
+    const warning = document.getElementById('rain-history-warning');
+    if (!warning) return;
+    renderRainHistory({
+        year,
+        annual_total_mm: null,
+        annual_available_days: 0,
+        annual_expected_days: 0,
+        incomplete: true,
+        warning: message,
+        months: rainMonthNames.map((_, month) => ({
+            month: month + 1,
+            total_mm: null,
+            available_days: 0,
+            expected_days: 0,
+            status: 'unavailable'
+        }))
+    });
+}
+
+async function loadRainHistory() {
+    const yearSelect = document.getElementById('rain-year-select');
+    if (!yearSelect) return;
+    const requestId = ++appState.rainHistoryRequestId;
+    try {
+        const response = await fetch(`/api/weather/rain-history/?year=${encodeURIComponent(yearSelect.value)}`);
+        const payload = await response.json();
+        if (requestId !== appState.rainHistoryRequestId) return;
+        if (!response.ok || !payload.success || !payload.data) {
+            throw new Error(payload.error || 'No se pudo consultar el historial de precipitaciones.');
+        }
+        renderRainHistory(payload.data);
+    } catch (error) {
+        if (requestId === appState.rainHistoryRequestId) {
+            renderRainHistoryError(error.message || 'No se pudo consultar el historial de precipitaciones.');
+        }
+    }
+}
+
+async function initializeTimeView() {
+    const yearSelect = document.getElementById('rain-year-select');
+    const currentYear = new Date().getFullYear();
+    if (yearSelect) {
+        yearSelect.innerHTML = `<option value="${currentYear}">${currentYear}</option>`;
+        yearSelect.addEventListener('change', loadRainHistory);
+    }
+
+    const monthSelect = document.getElementById('rain-month-select');
+    if (monthSelect) monthSelect.value = String(new Date().getMonth());
+    monthSelect?.addEventListener('change', () => {
+        if (appState.rainHistoryData) renderRainHistory(appState.rainHistoryData);
+    });
+
+    document.querySelectorAll('[data-weather-tab]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const historySelected = button.dataset.weatherTab === 'history';
+            document.querySelectorAll('[data-weather-tab]').forEach(tab => {
+                const active = tab === button;
+                tab.classList.toggle('is-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            document.getElementById('weather-current-panel').hidden = historySelected;
+            document.getElementById('rain-history-panel').hidden = !historySelected;
+            if (historySelected) {
+                stopWeatherAutoRefresh();
+                await loadRainHistory();
+            } else {
+                await loadWeatherData('#weather-current-content');
+                startWeatherAutoRefresh();
+            }
+        });
+    });
+
+    await loadWeatherData('#weather-current-content');
+    startWeatherAutoRefresh();
 }
 
 function renderAuthRequiredView() {
@@ -497,8 +717,11 @@ async function handleLogout() {
     appState.authenticated = false;
     appState.username = null;
     appState.ssoUrl = null;
+    appState.currentView = 'inicio';
     updateAuthUI();
     stopRealtimeFlowMonitor();
+    $('.options-active').removeClass('options-active');
+    $('#inicio').addClass('options-active');
 
     const contentDiv = document.getElementById('dynamic-content');
     if (contentDiv) {
@@ -580,7 +803,7 @@ async function loadView(viewName) {
         }
         
         // Detener el monitoreo en tiempo real si estamos saliendo de la vista de inicio
-        if (appState.currentView === 'inicio' && viewName !== 'inicio') {
+        if (['inicio', 'tiempo'].includes(appState.currentView) && viewName !== appState.currentView) {
             stopRealtimeFlowMonitor();
             stopWeatherAutoRefresh();
         }
@@ -601,6 +824,8 @@ async function loadView(viewName) {
         if (viewName === 'inicio') {
             // Inicializar la vista
             await initializeHomeView();
+        } else if (viewName === 'tiempo') {
+            await initializeTimeView();
         } else if (viewName === 'informes') {
             await initializeReportsView();
         } else if (viewName === 'cuaderno') {
@@ -1644,7 +1869,7 @@ $(document).ready(function() {
 });
 
 
-async function loadWeatherData() {
+async function loadWeatherData(target = '#tiempo .card-content') {
     if (appState.weatherRequestInProgress) {
         return;
     }
@@ -1655,14 +1880,14 @@ async function loadWeatherData() {
         const payload = await response.json();
 
         if (response.ok && payload.success && payload.data) {
-            $("#tiempo .card-content").html(renderWeatherCard(payload.data));
+            $(target).html(renderWeatherCard(payload.data));
         } else {
             const message = payload?.error || payload?.message || 'Centro meteorológico no disponible.';
-            $("#tiempo .card-content").html(renderWeatherUnavailable(message));
+            $(target).html(renderWeatherUnavailable(message));
         }
     } catch (error) {
         console.error('Error al cargar los datos meteorológicos:', error);
-        $("#tiempo .card-content").html(renderWeatherUnavailable('Centro meteorológico no disponible.'));
+        $(target).html(renderWeatherUnavailable('Centro meteorológico no disponible.'));
     } finally {
         appState.weatherRequestInProgress = false;
         appState.loadingStates.weather = true;

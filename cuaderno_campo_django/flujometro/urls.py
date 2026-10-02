@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/cuaderno/quick-stats", views.quick_stats, name="quick_stats"),
     path("api/weather", views.weather_current, name="weather"),
     path("api/weather/current/", views.weather_current, name="weather_current"),
+    path("api/weather/rain-history/", views.rain_history, name="rain_history"),
     path("api/visitas", views.visitas, name="visitas"),
     path("api/informes", views.informes, name="informes"),
     path("api/informes/generar", views.generar_informe, name="generar_informe"),

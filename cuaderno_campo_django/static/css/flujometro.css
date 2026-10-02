@@ -1336,3 +1336,211 @@ html, body, main {
         min-height: 44px;
     }
 }
+
+.weather-dashboard .dashboard-title {
+    margin: 0 0 1rem;
+}
+
+.weather-tabs {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #dfe6eb;
+}
+
+.weather-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: #63717d;
+    font-weight: 600;
+}
+
+.weather-tab.is-active {
+    border-bottom-color: var(--secondary-color);
+    color: var(--primary-color);
+}
+
+.weather-tab-panel[hidden] {
+    display: none;
+}
+
+.weather-section-card,
+.rain-chart-card {
+    margin: 0;
+}
+
+.weather-section-card .card-content {
+    min-height: 0;
+}
+
+.rain-history-toolbar {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 0.8rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.rain-select-field {
+    display: grid;
+    gap: 0.3rem;
+    min-width: 132px;
+    color: #52616d;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.rain-select-field .form-select {
+    min-height: 38px;
+}
+
+.rain-updated-label {
+    margin-left: auto;
+    padding-bottom: 0.45rem;
+    color: #71808b;
+    font-size: 0.82rem;
+}
+
+.rain-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.rain-summary-item {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 1rem 1.1rem;
+    border: 1px solid #e2e9ed;
+    border-left: 4px solid var(--secondary-color);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.rain-summary-item span,
+.rain-summary-item small {
+    color: #72808a;
+    font-size: 0.8rem;
+}
+
+.rain-summary-item strong {
+    color: var(--text-dark);
+    font-size: 1.65rem;
+    line-height: 1.2;
+}
+
+.rain-history-warning {
+    margin-bottom: 1rem;
+    padding: 0.8rem 1rem;
+    border-left: 4px solid #dc9a23;
+    border-radius: 4px;
+    background: #fff7e5;
+    color: #73510f;
+    font-size: 0.88rem;
+}
+
+.rain-chart-card h3 small {
+    color: #75828c;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.rain-monthly-chart {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(38px, 1fr));
+    gap: 0.4rem;
+    min-width: 640px;
+    padding: 0.4rem 0.2rem 0;
+}
+
+.rain-chart-card {
+    overflow-x: auto;
+}
+
+.rain-month-column {
+    display: grid;
+    grid-template-rows: 1.3rem 150px 1.4rem;
+    justify-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.rain-bar-value,
+.rain-month-label {
+    color: #63717d;
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
+.rain-bar-track {
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    width: 100%;
+    border-bottom: 1px solid #cfd9df;
+    background: repeating-linear-gradient(to bottom, transparent 0 36px, #edf1f3 36px 37px);
+}
+
+.rain-bar {
+    display: block;
+    width: min(70%, 28px);
+    min-height: 2px;
+    border-radius: 4px 4px 0 0;
+    background: var(--secondary-color);
+}
+
+.rain-bar.is-zero {
+    height: 2px !important;
+    background: #fff;
+    outline: 2px solid var(--secondary-color);
+    outline-offset: -1px;
+}
+
+.rain-bar.is-missing {
+    height: 100% !important;
+    border-radius: 3px 3px 0 0;
+    background: repeating-linear-gradient(135deg, #e1e6e9 0 4px, #f7f9fa 4px 8px);
+}
+
+@media (max-width: 768px) {
+    .weather-tabs {
+        overflow-x: auto;
+    }
+
+    .weather-tab {
+        flex: 0 0 auto;
+        padding: 0.65rem 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .rain-updated-label {
+        flex-basis: 100%;
+        margin-left: 0;
+        padding: 0;
+    }
+
+    .rain-summary-grid {
+        gap: 0.55rem;
+    }
+
+    .rain-summary-item {
+        padding: 0.8rem;
+    }
+
+    .rain-summary-item strong {
+        font-size: 1.35rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .rain-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}

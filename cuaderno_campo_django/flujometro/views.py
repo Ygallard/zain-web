@@ -1,5 +1,6 @@
 import calendar
 import json
+import logging
 import os
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
@@ -17,6 +18,9 @@ from usuarios.models import Usuario
 from usuarios.services.weather_service import WeatherService
 
 from .services import ArduinoFlowmeterService
+
+
+logger = logging.getLogger(__name__)
 
 
 def index(request):
@@ -106,6 +110,22 @@ def weather_current(request):
     data = payload.get("data") or payload
     fields = ("temperature", "humidity", "wind_speed", "wind_direction", "pressure", "rain_day", "uv", "feels_like", "updated_at", "updated_at_text")
     return JsonResponse({"success": True, "data": {field: data.get(field) for field in fields}, "cached": payload.get("cached", False)})
+
+
+@require_GET
+def rain_history(request):
+    raw_year = request.GET.get("year", "")
+    if not raw_year.isdigit() or len(raw_year) != 4:
+        return JsonResponse({"success": False, "error": "Indica un año válido."}, status=400)
+
+    try:
+        payload = WeatherService().get_rain_history(int(raw_year))
+    except Exception:
+        logger.exception("Weather history: error inesperado al procesar el historial")
+        return JsonResponse({"success": False, "error": "No se pudo consultar el historial de precipitaciones."}, status=503)
+    if not payload.get("success"):
+        return JsonResponse({"success": False, "error": payload.get("error")}, status=503)
+    return JsonResponse({"success": True, "data": payload})
 
 
 @csrf_exempt

@@ -2,7 +2,7 @@
 
 ## ✅ Implementación Completada
 
-Se ha implementado una integración completa con la **API Oficial REST de Weather Underground** para la estación FT0360 (ICATEM1).
+Se ha implementado una integración con la **API Oficial REST de Weather Underground** para la estación definida en `WU_STATION_ID`.
 
 ---
 
@@ -29,10 +29,19 @@ Se ha implementado una integración completa con la **API Oficial REST de Weathe
 
 ### ✓ Endpoint API
 - **URL**: `GET /api/weather/current/`
+- **Historial**: `GET /api/weather/rain-history/?year=AAAA`
 - **Método**: HTTP GET
 - **Response**: JSON con estructura uniforme
 - **Caché**: Responde desde caché si está disponible
 - **Refresco**: Auto-actualización cada 60 segundos en frontend
+
+### Historial de lluvias
+
+El historial reutiliza `WeatherService` y el endpoint diario oficial `https://api.weather.com/v2/pws/history/daily`, con las credenciales del backend existentes. Las consultas se dividen en rangos de hasta 30 días y solo se acumula `metric.precipTotal` de resúmenes diarios. No se mezclan observaciones horarias ni se convierten valores ausentes en cero. Los días duplicados cuentan una sola vez; cada mes y año informa su cobertura.
+
+Verificación con la estación configurada el 1 de octubre de 2026: la API respondió con siete resúmenes diarios para un rango de siete días y cada resumen inspeccionado incluyó `metric.precipTotal` numérico. Un rango solicitado de 31 días devolvió 30 resúmenes. Las consultas de junio de 2024 y junio de 2025 respondieron correctamente, pero sin observaciones. Por ello no se puede afirmar que haya cobertura histórica en esos períodos; la interfaz marca períodos vacíos o incompletos y no presenta una precipitación inventada.
+
+La suma de un período incompleto corresponde únicamente a los días con un valor numérico válido y aparece acompañada de su cobertura. Si el proveedor deja de responder, se conserva la última respuesta válida en caché para el historial.
 
 ### ✓ Seguridad
 - Credenciales SOLO en `.env` (no versionado)
@@ -61,8 +70,8 @@ Se ha implementado una integración completa con la **API Oficial REST de Weathe
 El archivo `.env` contiene:
 
 ```env
-WU_API_KEY=d9b4d14ffd5b4ee2b4d14ffd5bbee2d7
-WU_STATION_ID=ICATEM1
+WU_API_KEY=<configurar-en-el-entorno>
+WU_STATION_ID=<identificador-de-estacion>
 WU_STATION_KEY=L1SU8kP1
 ```
 
@@ -175,7 +184,7 @@ WeatherService.get_current_weather()
   ↓ NO
 ¿Credenciales configuradas? → NO → retornar error
   ↓ SÍ
-GET https://api.weatherunderground.com/v2/pws/observations/current
+GET https://api.weather.com/v2/pws/observations/current
   ↓
 ¿Respuesta válida? → NO → retornar error
   ↓ SÍ
@@ -198,11 +207,11 @@ Cada 60 segundos:
 El servicio registra eventos para diagnóstico:
 
 ```log
-DEBUG: Weather Service: consultando API para estación 'ICATEM1'
+DEBUG: Weather Service: consultando API para estación '<WU_STATION_ID>'
 DEBUG: Weather Service: normalizando observación con 25 campos
-INFO: Weather Service: datos obtenidos exitosamente para estación 'ICATEM1'
-DEBUG: Weather Service: datos desde caché para estación 'ICATEM1'
-WARNING: Weather Service: respuesta sin datos para estación 'ICATEM1'
+INFO: Weather Service: datos obtenidos exitosamente para estación '<WU_STATION_ID>'
+DEBUG: Weather Service: datos desde caché para estación '<WU_STATION_ID>'
+WARNING: Weather Service: respuesta sin datos para estación '<WU_STATION_ID>'
 ERROR: Weather Service: error de conexión con la API - [detalles limitados]
 ```
 
@@ -213,9 +222,9 @@ ERROR: Weather Service: error de conexión con la API - [detalles limitados]
 ### Weather Underground API
 
 - **Versión**: v2
-- **Endpoint**: `https://api.weatherunderground.com/v2/pws/observations/current`
+- **Endpoint**: `https://api.weather.com/v2/pws/observations/current`
 - **Parámetros**:
-  - `stationId`: ICATEM1
+  - `stationId`: el valor configurado en `WU_STATION_ID`
   - `apiKey`: d9b4d14ffd5b4ee2b4d14ffd5bbee2d7
   - `units`: m (métrico: °C, km/h, hPa, mm)
 
@@ -223,7 +232,7 @@ ERROR: Weather Service: error de conexión con la API - [detalles limitados]
 
 - **Backend**: Django default (puede ser Redis en producción)
 - **TTL**: 300 segundos (5 minutos)
-- **Prefijo**: `weather:current:ICATEM1`
+- **Prefijo**: `weather:current:<WU_STATION_ID>`
 
 ### Frontend AJAX
 
@@ -275,7 +284,7 @@ tail -f cuaderno_campo_django/manage.py
 
 ## ⚠️ Consideraciones
 
-1. **Conectividad**: Requiere acceso a `api.weatherunderground.com`
+1. **Conectividad**: Requiere acceso a `api.weather.com`
 2. **API Key**: Es personal y debe mantenerse en secreto (en `.env`)
 3. **Rate Limiting**: Weather Underground permite X llamadas/hora (varía por plan)
 4. **Caché**: Reduce llamadas a la API significativamente
@@ -298,10 +307,10 @@ tail -f cuaderno_campo_django/manage.py
 
 Si la API no responde:
 
-1. **Verificar conectividad**: `ping api.weatherunderground.com`
+1. **Verificar conectividad**: `ping api.weather.com`
 2. **Revisar `.env`**: Credenciales correctas
 3. **Revisar logs**: Django console output
-4. **Verificar estación**: `https://www.weatherunderground.com/dashboard/pws/ICATEM1`
+4. **Verificar estación**: `https://www.wunderground.com/dashboard/pws/<WU_STATION_ID>`
 5. **Test manual**: Script Python en Django shell
 
 ---
